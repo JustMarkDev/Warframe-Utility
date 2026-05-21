@@ -1,5 +1,7 @@
-import requests
+import time
 
+import requests
+import syndicate_mods
 
 
 # Base URL for WFM API v2
@@ -47,12 +49,24 @@ def fetch_lowest_price_online(item_slug):
         print(f"Error fetching orders for {item_slug}: {response.status_code}")
         return None
 
-def post_offers_for_all_slugs(session, item_slug_list, quantity=1):
+def list_available_syndicate_mods(syndicate_list, syndicate_rank):
+
+    available_slugs = []
+    
+    for rank_level, slugs in syndicate_list.items():
+        if rank_level <= int(syndicate_rank):
+            available_slugs.extend(slugs)
+            
+    return available_slugs
+
+def post_offers_for_all_slugs(session, syndicate_slug_list, quantity=1, syndicate_rank=0):
+    item_slug_list = list_available_syndicate_mods(syndicate_slug_list, syndicate_rank)
     for slug in item_slug_list:
         slug_lowest_price = fetch_lowest_price_online(slug)
         post_price = slug_lowest_price - 1
         print(f"Lowest price for {slug}: {slug_lowest_price} platinum. Posting offer at {post_price} platinum.")
         post_offer(session, slug, post_price, quantity, 0)
+        time.sleep(0.1)  # Sleep to avoid hitting rate limits
 
 def get_item_id_from_slug(item_slug):
     response = requests.get(f"{BASE_URL}/items/{item_slug}")
@@ -87,6 +101,8 @@ def post_offer(session, item_slug, platinum, quantity, rank):
 
 if __name__ == "__main__":
     session = login()
+    
+    # post_offers_for_all_slugs(session, syndicate_mods.steel_meridian_mods, quantity=1, syndicate_rank=5)
     # post_offers_for_all_slugs(session, )
     # get_item_id_from_slug("fireball_frenzy")
     # post_offer(session, "fireball_frenzy", 10, 1, 0)
