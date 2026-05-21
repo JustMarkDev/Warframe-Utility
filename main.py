@@ -5,21 +5,6 @@ import requests
 # Base URL for WFM API v2
 BASE_URL = "https://api.warframe.market/v2"
 
-headers = {
-    "Platform": "pc",
-    "Language": "en"
-}
-
-login_payload = {
-    "email": "costessera@gmail.com",
-    "password": "bMskf&NEY#aFbr9M",
-}
-
-auth_headers = {
-    "auth_type": "app",
-    "device_id": "python_script_utility"
-}
-
 def login():
     # 1. Open and read the full token (remove the 0)
     with open("settings.conf", "r") as file:
@@ -54,7 +39,7 @@ def login():
 
 
 def fetch_lowest_price_online(item_slug):
-    response = requests.get(f"{BASE_URL}/orders/item/{item_slug}/top", headers=headers)
+    response = requests.get(f"{BASE_URL}/orders/item/{item_slug}/top")
     if response.status_code == 200:
         data = response.json()["data"]["sell"][0]
         return data['platinum']
