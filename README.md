@@ -5,7 +5,9 @@ Use at your own peril.
 
 When ready this program will allow you to set the standing for all your syndicates (need to be done manually, as i don't think warframe has APIs to visualize that info) and from that automatically post sell orders for every mod that the sydicate has available depending on your rank and standing balance: example:
 
-You have steel meridian rank 5 and 100000 standing: 100000/25000 = 4 (25000 cost of a mod) instances of every mod that the seller sells will be created, at a price of the lowest at the moment online - 1 platinum, so that you improve your odds of converting you standing in sweet sweet platinum faster.
+You have steel meridian rank 5 and 100000 standing: 100000/25000 = 4 (25000 cost of a mod) instances of every mod that the seller sells will be created, at a price of the lowest at the moment online - 1 platinum, so that you improve your odds of converting your standing in sweet sweet platinum faster.
+
+Possibly implement a routine that periodically checks if you're being undercut, and updates the price accordingly.
 
 When you sell a copy of a mod, set a new quantity of all the "linked" mods (the ones from the same syndicate) available (in this example 3 as you now have only 75000 standing).
 
