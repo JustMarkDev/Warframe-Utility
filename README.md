@@ -11,7 +11,7 @@ An experimental automation tool designed to dynamically manage and scale Syndica
 
 ## 📌 Project Overview
 
-This utility automates the process of converting in-game Syndicate standing into Platinum. Instead of manually listing individual mods and updating prices, the script acts as an automated manager that scales item quantities based on your real-time faction balance.
+This utility automates the process of converting in-game Syndicate standing into Platinum. Instead of manually listing individual mods and updating prices, the script acts as an automated manager that scales item quantities based on your inputted faction balance.
 
 [ Standing Balance ] ──> [ Calculate Inventory ] ──> [ Live Market Ledger ]
 (e.g., 100,000)          (100k / 25k = 4 units)         ( Cheaper by 1p )
