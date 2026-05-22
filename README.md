@@ -1,14 +1,44 @@
-DISCLAIMER: this is a learning experience more than it is an actual project (in short i have no idea of what i'm doing), and as such, there is more than a little use of AI in it.
-I have no idea if this is allowed or not by the terms of service of warframe.market, and this project is in no way associated with them.
-Use at your own peril. 
+# Warframe Market Syndicate Automator
 
+An experimental automation tool designed to dynamically manage and scale Syndicate offerings on `warframe.market`.
 
-When ready this program will allow you to set the standing for all your syndicates (need to be done manually, as i don't think warframe has APIs to visualize that info) and from that automatically post sell orders for every mod that the sydicate has available depending on your rank and standing balance: example:
+---
 
-You have steel meridian rank 5 and 100000 standing: 100000/25000 = 4 (25000 cost of a mod) instances of every mod that the seller sells will be created, at a price of the lowest at the moment online - 1 platinum, so that you improve your odds of converting your standing in sweet sweet platinum faster.
+> [!CAUTION]
+> **Disclaimer:** This project is a personal learning experience built with extensive use of AI assistance. It is completely independent and not affiliated with `warframe.market`. Automating platform interactions may violate their Terms of Service. **Use at your own risk.**
 
-Possibly implement a routine that periodically checks if you're being undercut, and updates the price accordingly.
+---
 
-When you sell a copy of a mod, set a new quantity of all the "linked" mods (the ones from the same syndicate) available (in this example 3 as you now have only 75000 standing).
+## 📌 Project Overview
 
-At the moment the program doesn't do any of that, and i have no estimates for when it will be in ay way ready.
+This utility automates the process of converting in-game Syndicate standing into Platinum. Instead of manually listing individual mods and updating prices, the script acts as an automated manager that scales item quantities based on your real-time faction balance.
+
+[ Standing Balance ] ──> [ Calculate Inventory ] ──> [ Live Market Ledger ]
+(e.g., 100,000)          (100k / 25k = 4 units)         ( Cheaper by 1p )
+
+---
+
+## 🛠️ Planned Features & Logic
+
+### 1. Manual Ledger Sync
+Since Warframe does not provide public APIs for player standing, you manually input your current rank and standing balances into a local config file, which the program uses as its source of truth.
+
+### 2. Automated Undercutting
+The engine automatically scans active online sellers for each mod and sets your price to:
+
+$$\text{Your Price} = \text{Cheapest Online Price} - 1\text{p}$$
+
+### 3. Dynamic Quantity Scaling
+Your listing quantities are directly tied to your available standing. When you log a sale, the script recalculates your balance and updates all linked mods in that syndicate:
+
+* **Before Sale:** **100,000 standing** with *Steel Meridian* = Lists **4 copies** of every mod.
+* **After Sale:** You sell 1 mod, dropping you to **75,000 standing** = Automatically updates all remaining listings to **3 copies**.
+
+### 4. Price Monitor *(Planned)*
+A background routine to periodically check if you are being undercut and adjust your active prices to keep your listings competitive.
+
+---
+
+## 📅 Project Status
+
+This utility is currently in early prototyping. The core logic is undergoing testing, and **there is no current timeline for a stable release.**
