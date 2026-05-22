@@ -12,6 +12,52 @@ if "initial_load" not in st.session_state:
 
 session = oph.login()
 
+if session is None:
+    st.warning("⚠️ **Authentication Required:** Streamlit is currently unable to connect to your `warframe.market` account.")
+    
+    st.markdown("""
+    This utility needs a **JWT Session Token** to communicate with `warframe.market` on your behalf.
+    Because of browser security policies, we cannot automatically read this from your browser. 
+    However, you can set it up in **under 20 seconds** by following the simple steps below:
+    """)
+    
+    with st.container(border=True):
+        st.markdown("### 🔑 Guided Setup Wizard")
+        
+        st.markdown("""
+        **Step 1: Log In to Warframe Market**  
+        Ensure you are logged in to your account. Click the button below to open the website in a new tab:
+        """)
+        st.link_button("🌐 Open warframe.market", "https://warframe.market", use_container_width=True)
+        
+        st.markdown("""
+        **Step 2: Retrieve the JWT Cookie**  
+        * Open your browser's Developer Tools (press **F12** or **Ctrl+Shift+I**).
+        * Go to the **Application** tab (Chrome/Edge) or **Storage** tab (Firefox).
+        * In the left sidebar, expand **Cookies** and select `https://warframe.market`.
+        * Find the cookie named **`JWT`** (all capitals).
+        * Double-click the **Value** column of the `JWT` row and copy it.
+        """)
+        
+        st.info("💡 **Tip:** The token is a long, randomized string of letters and numbers.")
+        
+        input_token = st.text_input("Paste your JWT Token here:", type="password", help="Your token is kept strictly local and is only used to make requests directly to warframe.market APIs.")
+        
+        if st.button("🔑 Authenticate and Save", type="primary", use_container_width=True):
+            if input_token:
+                with st.spinner("Validating token with warframe.market..."):
+                    test_session = oph.save_token(input_token)
+                    if test_session:
+                        st.success(f"Successfully logged in as **{test_session.accountName}**!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid JWT token. Please make sure you copied the entire value exactly.")
+            else:
+                st.warning("Please paste a token before submitting.")
+                
+    st.stop()  # Stop rendering the rest of the application
+
+
 @st.dialog("Resolve Syndicate Overlap")
 def show_faction_choice_modal(valid_factions, sold_qty, original_qty):
     st.write("This item belongs to multiple syndicates you represent. Which pool should spend the standing?")
