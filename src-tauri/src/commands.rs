@@ -6,6 +6,33 @@ use crate::market::MarketClient;
 const STATUS_PATH: &str = "syndicate_status.json";
 const SETTINGS_PATH: &str = "settings.conf";
 
+/// Syncs warframe.market sell listings for one faction to match the current
+/// standing. If the faction has listable quantity > 0, every mod is posted or
+/// undercut by 1 platinum. If standing has dropped to zero, every listing is
+/// deleted. All market errors propagate — callers are responsible for deciding
+/// whether to roll back any prior state changes.
+async fn sync_listings(client: &MarketClient, state: &SyndicateState) -> Result<(), AppError> {
+    let mods = get_syndicate_mods(&state.faction_key, state.rank);
+    let qty = state.listable_quantity();
+
+    if qty > 0 {
+        for m in &mods {
+            let lowest = client.get_lowest_price(m).await?;
+            let price = match lowest {
+                Some(p) => i32::max(1, p - 1),
+                None => 10,
+            };
+            client.post_or_update_listing(m, qty, price).await?;
+        }
+    } else {
+        for m in &mods {
+            client.delete_listing(m).await?;
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Serialize)]
 pub struct InitData {
     pub standings: Vec<SyndicateState>,
@@ -77,23 +104,8 @@ pub async fn publish_syndicate(faction_key: String) -> Result<Vec<String>, AppEr
     
     let client = MarketClient::new(&token);
     let available_mods = get_syndicate_mods(&faction_key, state.rank);
-    let listable_qty = state.listable_quantity();
 
-    if listable_qty <= 0 {
-        for m in &available_mods {
-            let _ = client.delete_listing(m).await;
-        }
-        return Ok(available_mods.into_iter().map(|s| s.to_string()).collect());
-    }
-
-    for m in &available_mods {
-        let lowest = client.get_lowest_price(m).await?;
-        let price = match lowest {
-            Some(p) => i32::max(1, p - 1),
-            None => 10,
-        };
-        client.post_or_update_listing(m, listable_qty, price).await?;
-    }
+    sync_listings(&client, state).await?;
 
     Ok(available_mods.into_iter().map(|s| s.to_string()).collect())
 }
@@ -148,25 +160,10 @@ pub async fn record_sale(item_slug: String, quantity: i32, faction_choice: Optio
     
     save_all_standings(STATUS_PATH, &standings).await?;
 
-    // Cascade Updates
+    // Cascade Updates — sync listings atomically; if this fails the sale is
+    // still committed to disk but the caller receives the error.
     let updated_state = standings.get(&chosen_faction).unwrap();
-    let faction_mods = get_syndicate_mods(&chosen_faction, updated_state.rank);
-    let new_qty = updated_state.listable_quantity();
-
-    if new_qty > 0 {
-        for m in &faction_mods {
-            let lowest = client.get_lowest_price(m).await?;
-            let price = match lowest {
-                Some(p) => i32::max(1, p - 1),
-                None => 10,
-            };
-            let _ = client.post_or_update_listing(m, new_qty, price).await;
-        }
-    } else {
-        for m in &faction_mods {
-            let _ = client.delete_listing(m).await;
-        }
-    }
+    sync_listings(&client, updated_state).await?;
 
     Ok(chosen_faction)
 }

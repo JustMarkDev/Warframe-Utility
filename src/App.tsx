@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
@@ -24,65 +24,53 @@ interface LogEntry {
 
 // Flat list of all available mod slugs for autocomplete helper
 const ALL_MODS = [
-  "scattered_justice", "justice_blades", "neutralizing_justice", "shattering_justice",
-  "path_of_statues", "tectonic_fracture", "ore_gaze", "titanic_rumbler", "rubble_heap", "recrystalize",
-  "fireball_frenzy", "immolated_radiance", "healing_flame", "exothermic",
-  "surging_dash", "radiant_finish", "furious_javelin", "chromatic_blade",
-  "freeze_force", "ice_wave_impedance", "chilling_globe", "icy_avalanche", "biting_frost",
-  "dread_ward", "blood_forge", "blending_talons",
-  "gourmand", "hearty_nourishment", "catapult",
-  "accumulating_whipclaw", "venari_bodyguard", "pilfering_strangledome",
-  "wrath_of_ukko",
-  "ballistic_bullseye", "staggering_shield", "muzzle_flash", "mesas_waltz",
-  "pyroclastic_flow", "reaping_chakram", "safeguard", "divine_retribution", "controlled_slide",
-  "teeming_virulence", "larva_burst", "parasitic_vitality", "insatiable", "abundant_mutation",
-  "neutron_star", "antimatter_absorb", "escape_velocity", "molecular_fission",
-  "smite_infusion", "hallowed_eruption", "phoenix_renewal", "hallowed_reckoning",
-  "ironclad_charge", "iron_shrapnel", "piercing_roar", "reinforcing_stomp",
-  "venom_dose", "revealing_spores", "regenerative_molt", "contagion_cloud",
-  "ulfruns_endurance", "vampiric_grasp", "the_relentless_lost",
-  "gilded_truth", "blade_of_truth", "stinging_truth", "avenging_truth",
-  "seeking_shuriken", "smoke_shadow", "fatal_teleport", "rising_storm",
-  "elusive_retribution", "endless_lullaby", "reactive_storm",
-  "duality", "calm_and_frenzy", "peaceful_provocation", "energy_transfer",
-  "shattered_storm", "mending_splinters", "spectrosiphon",
-  "mach_crash", "thermal_transfer",
-  "coil_recharge", "cathode_current",
-  "tribunal", "warding_thurible", "lasting_covenant",
-  "elemental_sandstorm", "negation_swarm", "desiccations_curse",
-  "rift_haven", "rift_torrent", "cataclysmic_continuum",
-  "savior_decoy", "hushed_invisibility", "safeguard_switch", "irradiating_disarm", "damage_decoy",
-  "hall_of_malevolence", "explosive_legerdemain", "total_eclipse",
-  "mind_freak", "pacifying_bolts", "chaos_sphere", "assimilate",
-  "repair_dispensary", "temporal_erosion", "temporal_artillery",
-  "axios_javelineers", "intrepid_stand",
-  "shock_trooper", "shocking_speed", "transistor_shield", "capacitance",
-  "celestial_stomp", "enveloping_cloud", "primal_rage",
-  "merulina_guardian", "loyal_merulina", "surging_blades",
-  "entropy_spike", "entropy_flight", "entropy_detonation", "entropy_burst",
-  "sonic_fracture", "resonance", "savage_silence", "resonating_quake",
-  "afterburn", "everlasting_ward", "guardian_armor", "vexing_retaliation", "guided_effigy",
-  "balefire_surge", "blazing_pillage", "aegis_gale",
-  "viral_tempest", "tidal_impunity", "rousing_plunder", "pilfering_swarm",
-  "empowered_quiver", "piercing_navigator", "infiltrate", "concentrated_arrow",
-  "partitioned_mallet", "conductor", "wrecking_wall",
-  "thrall_pact", "mesmer_shield", "blinding_reave",
-  "shadow_haze", "dark_propagation",
-  "tesla_bank", "photon_repeater", "repelling_bastille",
-  "toxic_sequence", "deadly_sequence", "voltage_sequence", "sequence_burn",
-  "spectral_spirit", "greedy_pull", "magnetized_discharge", "counter_pulse", "fracturing_crush",
-  "soul_survivor", "creeping_terrify", "despoil", "shield_of_shadows",
-  "pool_of_life", "vampire_leech", "abating_link", "champions_blessing",
-  "swing_line", "eternal_war", "prolonged_paralysis", "enraged", "hysterical_assault",
-  "gleaming_blight", "eroding_blight", "toxic_blight", "stockpiled_blight",
-  "valence_formation", "swift_bite", "spellbound_harvest", "beguiling_lantern", "razorwing_blitz", "ironclad_flight",
-  "target_fixation", "airburst_rounds", "jet_stream", "funnel_clouds", "anchored_glide",
-  "winds_of_purity", "bright_purity", "lasting_purity", "disarming_purity",
-  "fused_reservoir", "critical_surge", "warriors_rest"
+  "abating_link", "abundant_mutation", "accumulating_whipclaw", "aegis_gale", "afterburn",
+  "airburst_rounds", "anchored_glide", "antimatter_absorb", "assimilate", "axios_javelineers",
+  "balefire_surge", "ballistic_bullseye", "beguiling_lantern", "biting_frost", "blazing_pillage",
+  "blending_talons", "blinding_reave", "blood_forge", "calm_&_frenzy", "capacitance",
+  "cataclysmic_continuum", "cataclysmic_gate", "catapult", "cathode_current", "celestial_stomp",
+  "champions_blessing", "chaos_sphere", "chilling_globe", "chromatic_blade", "coil_recharge",
+  "concentrated_arrow", "conductive_sphere", "conductor", "contagion_cloud", "controlled_slide",
+  "counter_pulse", "creeping_terrify", "critical_surge", "damage_decoy", "dark_propagation",
+  "desiccations_curse", "despoil", "divine_retribution", "dread_ward", "duality",
+  "elemental_sandstorm", "elusive_retribution", "empowered_quiver", "endless_lullaby",
+  "energy_transfer", "enraged", "entropy_burst", "entropy_detonation", "entropy_flight",
+  "entropy_spike", "enveloping_cloud", "escape_velocity", "eternal_war", "everlasting_ward",
+  "exothermic", "explosive_legerdemain", "fireball_frenzy", "fracturing_crush", "freeze_force",
+  "funnel_clouds", "furious_javelin", "fused_crucible", "fused_reservoir", "gastro", "gourmand",
+  "greedy_pull", "guardian", "guardian_armor", "guided_effigy", "hall_of_malevolence",
+  "hallowed_eruption", "hallowed_reckoning", "healing_flame", "hearty_nourishment",
+  "hushed_invisibility", "hysterical_assault", "ice_wave_impedance", "icy_avalanche",
+  "immolated_radiance", "infiltrate", "insatiable", "intrepid_stand", "iron_shrapnel",
+  "ironclad_charge", "ironclad_flight", "irradiating_disarm", "jades_judgment", "jet_stream",
+  "justice_blades", "larva_burst", "lasting_covenant", "lingering_transmutation", "loyal_merulina",
+  "mach_crash", "magnetized_discharge", "mending_splinters", "merulina_guardian", "mesas_waltz",
+  "mesmer_shield", "mind_freak", "molecular_fission", "muzzle_flash", "negation_armor",
+  "neutralizing_justice", "neutron_star", "omikujis_fortune", "ore_gaze", "pacifying_bolts",
+  "parasitic_vitality", "partitioned_mallet", "path_of_statues", "peaceful_provocation",
+  "phoenix_renewal", "photon_repeater", "piercing_navigator", "piercing_roar",
+  "pilfering_strangledome", "pilfering_swarm", "pool_of_life", "prey_of_dynar", "primal_rage",
+  "prismatic_companion", "prolonged_paralysis", "pyroclastic_flow", "radiant_finish",
+  "razor_mortar", "razorwing_blitz", "reactive_storm", "reaping_chakram", "recrystalize",
+  "regenerative_molt", "reinforcing_stomp", "repair_dispensary", "resonance", "resonating_quake",
+  "revealing_spores", "reverse_rotorswell", "rift_haven", "rift_torrent", "rising_storm",
+  "rousing_plunder", "rubble_heap", "safeguard", "safeguard_switch", "savage_silence",
+  "savior_decoy", "scattered_justice", "seeking_shuriken", "shadow_haze", "shattered_storm",
+  "shattering_justice", "shield_of_shadows", "shock_trooper", "shocking_speed", "smite_infusion",
+  "smoke_shadow", "sonic_fracture", "soul_survivor", "spectral_spirit", "spectrosiphon",
+  "spellbound_harvest", "staggering_shield", "surging_blades", "surging_dash", "swift_bite",
+  "swing_line", "target_fixation", "tectonic_fracture", "teeming_virulence", "teleport_rush",
+  "temporal_artillery", "temporal_erosion", "tesla_bank", "tharros_lethality",
+  "the_relentless_lost", "thermal_transfer", "thrall_pact", "tidal_impunity", "titanic_rumbler",
+  "total_eclipse", "transistor_shield", "tribunal", "ulfruns_endurance", "untime_rift",
+  "valence_formation", "vampire_leech", "vampiric_grasp", "venari_bodyguard", "venom_dose",
+  "vexing_retaliation", "viral_tempest", "volatile_recompense", "warding_thurible",
+  "warriors_rest", "wrath_of_ukko", "wrecking_wall",
 ].sort();
 
 function App() {
   const [loading, setLoading] = useState(true);
+  const debounceTimeouts = useRef<Record<string, any>>({});
   const [authenticated, setAuthenticated] = useState(false);
   const [accountName, setAccountName] = useState<string | null>(null);
   const [standings, setStandings] = useState<SyndicateState[]>([]);
@@ -198,17 +186,23 @@ function App() {
     }
   };
 
-  const handleStandingChange = async (factionKey: string, standing: number) => {
+  const handleStandingChange = (factionKey: string, standing: number) => {
     // Immediate reactive local update
     setStandings((prev) =>
       prev.map((s) => (s.faction_key === factionKey ? { ...s, standing } : s))
     );
 
-    try {
-      await invoke("update_standing", { factionKey, standing, rank: null });
-    } catch (e: any) {
-      addLog(`Sync error for ${factionKey}: ${JSON.stringify(e)}`, "error");
+    if (debounceTimeouts.current[factionKey]) {
+      clearTimeout(debounceTimeouts.current[factionKey]);
     }
+
+    debounceTimeouts.current[factionKey] = setTimeout(async () => {
+      try {
+        await invoke("update_standing", { factionKey, standing, rank: null });
+      } catch (e: any) {
+        addLog(`Sync error for ${factionKey}: ${JSON.stringify(e)}`, "error");
+      }
+    }, 150);
   };
 
   const handleRankChange = async (factionKey: string, rank: number) => {

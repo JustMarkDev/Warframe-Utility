@@ -1,0 +1,4 @@
+src-tauri/syndicate_status.json
+src-tauri/settings.conf
+**/syndicate_status.json
+**/settings.conf

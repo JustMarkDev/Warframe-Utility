@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Tauri runtime data — user-specific, must never be committed
+src-tauri/settings.conf
+src-tauri/syndicate_status.json
+
+# Leftover scaffold
+temp-vite/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

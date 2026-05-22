@@ -2,8 +2,17 @@ use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
 use crate::domain::{SyndicateState, AppError};
+use std::sync::OnceLock;
+use tokio::sync::Mutex;
+
+static FILE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn get_file_lock() -> &'static Mutex<()> {
+    FILE_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 pub async fn load_all_standings<P: AsRef<Path>>(path: P) -> Result<HashMap<String, SyndicateState>, AppError> {
+    let _lock = get_file_lock().lock().await;
     let factions = vec![
         "steel_meridian",
         "arbiters_of_hexis",
@@ -26,10 +35,7 @@ pub async fn load_all_standings<P: AsRef<Path>>(path: P) -> Result<HashMap<Strin
         Err(_) => return Ok(HashMap::new()),
     };
 
-    let raw: HashMap<String, serde_json::Value> = match serde_json::from_str(&content) {
-        Ok(r) => r,
-        Err(_) => HashMap::new(),
-    };
+    let raw: HashMap<String, serde_json::Value> = serde_json::from_str(&content).unwrap_or_else(|_| HashMap::new());
 
     let mut states = HashMap::new();
     for f in factions {
@@ -47,6 +53,7 @@ pub async fn load_all_standings<P: AsRef<Path>>(path: P) -> Result<HashMap<Strin
 }
 
 pub async fn save_all_standings<P: AsRef<Path>>(path: P, states: &HashMap<String, SyndicateState>) -> Result<(), AppError> {
+    let _lock = get_file_lock().lock().await;
     let mut raw = serde_json::Map::new();
     for (k, v) in states {
         let mut inner = serde_json::Map::new();
@@ -62,6 +69,7 @@ pub async fn save_all_standings<P: AsRef<Path>>(path: P, states: &HashMap<String
 }
 
 pub async fn load_jwt<P: AsRef<Path>>(path: P) -> Result<Option<String>, AppError> {
+    let _lock = get_file_lock().lock().await;
     if !path.as_ref().exists() {
         // Initialize file if not exist
         let _ = fs::write(&path, "").await;
@@ -77,6 +85,7 @@ pub async fn load_jwt<P: AsRef<Path>>(path: P) -> Result<Option<String>, AppErro
 }
 
 pub async fn save_jwt<P: AsRef<Path>>(path: P, token: &str) -> Result<(), AppError> {
+    let _lock = get_file_lock().lock().await;
     fs::write(path, token.trim()).await?;
     Ok(())
 }
