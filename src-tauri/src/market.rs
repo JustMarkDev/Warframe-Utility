@@ -1,0 +1,145 @@
+use reqwest::Client;
+use serde_json::Value;
+use crate::domain::AppError;
+
+pub struct MarketClient {
+    client: Client,
+    base_url: String,
+}
+
+impl MarketClient {
+    pub fn new(token: &str) -> Self {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("User-Agent", reqwest::header::HeaderValue::from_static("WarframeUtilityApp/1.0.0 (Tauri Rust)"));
+        headers.insert("Accept", reqwest::header::HeaderValue::from_static("application/json"));
+        headers.insert("Content-Type", reqwest::header::HeaderValue::from_static("application/json"));
+        
+        let auth_val = format!("Bearer {}", token);
+        if let Ok(hv) = reqwest::header::HeaderValue::from_str(&auth_val) {
+            headers.insert("Authorization", hv);
+        }
+        
+        headers.insert("platform", reqwest::header::HeaderValue::from_static("pc"));
+        headers.insert("language", reqwest::header::HeaderValue::from_static("en"));
+        headers.insert("Origin", reqwest::header::HeaderValue::from_static("https://warframe.market"));
+        headers.insert("Referer", reqwest::header::HeaderValue::from_static("https://warframe.market/"));
+
+        let client = Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+
+        Self {
+            client,
+            base_url: "https://api.warframe.market/v2".to_string(),
+        }
+    }
+
+    pub async fn validate_token(&self) -> Result<String, AppError> {
+        let url = format!("{}/me", self.base_url);
+        let resp = self.client.get(&url).send().await?;
+        if resp.status().is_success() {
+            let data: Value = resp.json().await?;
+            let slug = data["data"]["slug"].as_str().unwrap_or("Unknown Tenno").to_string();
+            Ok(slug)
+        } else {
+            Err(AppError::Other(format!("Authentication failed with status: {}", resp.status())))
+        }
+    }
+
+    pub async fn get_lowest_price(&self, item_slug: &str) -> Result<Option<i32>, AppError> {
+        let url = format!("{}/orders/item/{}/top", self.base_url, item_slug);
+        let resp = self.client.get(&url).send().await?;
+        if resp.status().is_success() {
+            let data: Value = resp.json().await?;
+            if let Some(sell_orders) = data["data"]["sell"].as_array() {
+                if let Some(first_order) = sell_orders.first() {
+                    if let Some(plat) = first_order["platinum"].as_i64() {
+                        return Ok(Some(plat as i32));
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn get_item_id(&self, item_slug: &str) -> Result<String, AppError> {
+        let url = format!("{}/items/{}", self.base_url, item_slug);
+        let resp = self.client.get(&url).send().await?;
+        if resp.status().is_success() {
+            let data: Value = resp.json().await?;
+            if let Some(id) = data["data"]["id"].as_str() {
+                return Ok(id.to_string());
+            }
+        }
+        Err(AppError::Other(format!("Failed to retrieve item ID for '{}'", item_slug)))
+    }
+
+    pub async fn get_active_order_id(&self, item_id: &str) -> Result<Option<String>, AppError> {
+        let url = format!("{}/orders/my", self.base_url);
+        let resp = self.client.get(&url).send().await?;
+        if resp.status().is_success() {
+            let data: Value = resp.json().await?;
+            if let Some(orders) = data["data"].as_array() {
+                for order in orders {
+                    if order["itemId"].as_str() == Some(item_id) {
+                        if let Some(order_id) = order["id"].as_str() {
+                            return Ok(Some(order_id.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn post_or_update_listing(&self, item_slug: &str, quantity: i32, price: i32) -> Result<(), AppError> {
+        let item_id = self.get_item_id(item_slug).await?;
+        let active_order = self.get_active_order_id(&item_id).await?;
+
+        if let Some(order_id) = active_order {
+            let url = format!("{}/order/{}", self.base_url, order_id);
+            let payload = serde_json::json!({
+                "platinum": price,
+                "quantity": quantity
+            });
+            let resp = self.client.patch(&url).json(&payload).send().await?;
+            if !resp.status().is_success() {
+                return Err(AppError::Other(format!("Failed to update listing for {}: {}", item_slug, resp.status())));
+            }
+        } else {
+            let url = format!("{}/order", self.base_url);
+            let payload = serde_json::json!({
+                "itemId": item_id,
+                "type": "sell",
+                "platinum": price,
+                "quantity": quantity,
+                "rank": 0,
+                "visible": true
+            });
+            let resp = self.client.post(&url).json(&payload).send().await?;
+            if !resp.status().is_success() {
+                return Err(AppError::Other(format!("Failed to create listing for {}: {}", item_slug, resp.status())));
+            }
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
+        Ok(())
+    }
+
+    pub async fn delete_listing(&self, item_slug: &str) -> Result<(), AppError> {
+        let item_id = self.get_item_id(item_slug).await?;
+        let active_order = self.get_active_order_id(&item_id).await?;
+
+        if let Some(order_id) = active_order {
+            let url = format!("{}/order/{}", self.base_url, order_id);
+            let resp = self.client.delete(&url).send().await?;
+            if !resp.status().is_success() {
+                return Err(AppError::Other(format!("Failed to delete listing for {}: {}", item_slug, resp.status())));
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
+        }
+
+        Ok(())
+    }
+}
