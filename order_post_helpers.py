@@ -241,11 +241,24 @@ def update_order(session, item_slug, new_price=None, new_quantity=None):
 BASE_URL = "https://api.warframe.market/v2"
 
 def login():
-    with open("settings.conf", "r") as file:
-        jwt_token = file.readline().strip()
+    try:
+        with open("settings.conf", "r") as file:
+            jwt_token = file.readline().strip()
+    except FileNotFoundError:
+        # Create empty placeholder file so subsequent runs don't crash
+        try:
+            with open("settings.conf", "w") as file:
+                file.write("")
+        except Exception:
+            pass
+        return None
+    except Exception:
+        return None
+        
+    if not jwt_token or jwt_token == "PASTE_YOUR_WARFRAME_MARKET_JWT_COOKIE_HERE":
+        return None
         
     session = requests.Session()
-    
     session.headers.update({
         "User-Agent": "WarframeUtilityApp/1.0.0 (Python requests)",
         "Accept": "application/json",
@@ -258,19 +271,52 @@ def login():
     })
     
     print("Attempting profile lookup with manual token...")
-    
-    profile_response = session.get(f"{BASE_URL}/me")
-    
-    if profile_response.status_code == 200:
-        print("Success! Authenticated via settings.conf token.")
-        print(profile_response.json())
-        profile_data = profile_response.json().get("data", {})
-        session.accountName = profile_data.get("slug", "Unknown Tenno")
-        return session # Return the active authenticated session to use elsewhere
-    else:
-        print(f"Failed to access profile. Status Code: {profile_response.status_code}")
-        print(profile_response.text)
+    try:
+        profile_response = session.get(f"{BASE_URL}/me")
+        if profile_response.status_code == 200:
+            print("Success! Authenticated via settings.conf token.")
+            profile_data = profile_response.json().get("data", {})
+            session.accountName = profile_data.get("slug", "Unknown Tenno")
+            return session
+        else:
+            print(f"Failed to access profile. Status Code: {profile_response.status_code}")
+            return None
+    except Exception as e:
+        print(f"Connection error during login: {e}")
         return None
+
+def save_token(jwt_token):
+    jwt_token = jwt_token.strip()
+    if not jwt_token:
+        return None
+        
+    # Attempt verification
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "WarframeUtilityApp/1.0.0 (Python requests)",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {jwt_token}",
+        "platform": "pc",
+        "language": "en",
+        "Origin": "https://warframe.market",
+        "Referer": "https://warframe.market/"
+    })
+    
+    try:
+        profile_response = session.get(f"{BASE_URL}/me")
+        if profile_response.status_code == 200:
+            profile_data = profile_response.json().get("data", {})
+            session.accountName = profile_data.get("slug", "Unknown Tenno")
+            
+            # If valid, write to settings.conf
+            with open("settings.conf", "w") as file:
+                file.write(jwt_token)
+            return session
+    except Exception as e:
+        print(f"Token validation error: {e}")
+        
+    return None
 
     
 if __name__ == "__main__":
