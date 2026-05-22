@@ -44,7 +44,14 @@ A background routine to periodically check if you are being undercut and adjust 
 This utility is currently in early prototyping. The core logic is undergoing testing, and **there is no current timeline for a stable release.**
 
 What Works For Now:
-
+1) login to your warframe.market account via jwt token. The token needs to be taken from your browser:
+   - after loggin in via browser f12 to open inspect view
+   - find the storage tab
+   - on the left seleect cookies
+   - warframe.market
+   - there should be only one entry "JWT"
+   - copy the value inside the settings.conf file in the root of the project (if the file doesn't exist, create it)
+   - now you are logged in 
 1) post offer via script
 2) post all mods purchaseable via one syndicate (only the six that sell augments for now) in quantity compatible with your standing availability
 3) update or delete listing if you sell some or all the mods respectively
