@@ -1,20 +1,18 @@
 import time
+from math import floor
 
 import requests
 import syndicate_mods
+import items_sold_helper
 
-
-# Base URL for WFM API v2
 BASE_URL = "https://api.warframe.market/v2"
 
 def login():
-    # 1. Open and read the full token (remove the 0)
     with open("settings.conf", "r") as file:
         jwt_token = file.readline().strip()
         
     session = requests.Session()
     
-    # 2. Update headers globally with your valid browser token
     session.headers.update({
         "User-Agent": "WarframeUtilityApp/1.0.0 (Python requests)",
         "Accept": "application/json",
@@ -53,20 +51,43 @@ def list_available_syndicate_mods(syndicate_list, syndicate_rank):
 
     available_slugs = []
     
+    
     for rank_level, slugs in syndicate_list.items():
+        if rank_level == "cost":
+            continue
         if rank_level <= int(syndicate_rank):
             available_slugs.extend(slugs)
             
     return available_slugs
 
-def post_offers_for_all_slugs(session, syndicate_slug_list, quantity=1, syndicate_rank=0):
+def post_offers_for_all_slugs(session, syndicate_slug_list, standing=0, syndicate_rank=0):
+    quantity = floor(standing/syndicate_slug_list["cost"]) # some syndicates have 20k mods while others 25k, so we calculate quantity based on the cost of the mods
+                                                           # for that syndicate
     item_slug_list = list_available_syndicate_mods(syndicate_slug_list, syndicate_rank)
-    for slug in item_slug_list:
-        slug_lowest_price = fetch_lowest_price_online(slug)
-        post_price = slug_lowest_price - 1
-        print(f"Lowest price for {slug}: {slug_lowest_price} platinum. Posting offer at {post_price} platinum.")
-        post_offer(session, slug, post_price, quantity, 0)
-        time.sleep(0.1)  # Sleep to avoid hitting rate limits
+    if quantity > 0:
+        for slug in item_slug_list:
+            slug_lowest_price = fetch_lowest_price_online(slug)
+            post_price = slug_lowest_price - 1
+            print(f"Lowest price for {slug}: {slug_lowest_price} platinum. Posting offer at {post_price} platinum.")
+            post_offer(session, slug, post_price, quantity, 0)
+            time.sleep(0.1)  # Sleep to avoid hitting rate limits
+    else:
+        print(f"Not enough standing to post offers. Required: {syndicate_slug_list['cost']}, Available: {standing}")
+
+def check_current_offers(session):
+    response = session.get(f"{BASE_URL}/orders/my")
+    if response.status_code == 200:
+        orders = response.json().get("data", [])
+        print(f"Current active orders: {len(orders)}")
+        for order in orders:
+            print(f"Order ID: {order['id']}, Price: {order['platinum']}p, Quantity: {order['quantity']}")
+    else:
+        print(f"Failed to fetch current offers. Status Code: {response.status_code}")
+        print(response.text)
+    return response.json().get("data", [])
+
+
+
 
 def get_item_id_from_slug(item_slug):
     response = requests.get(f"{BASE_URL}/items/{item_slug}")
@@ -99,11 +120,12 @@ def post_offer(session, item_slug, platinum, quantity, rank):
         print(f"Server message: {response.text}")
         return None
 
+
 if __name__ == "__main__":
     session = login()
-    
-    # post_offers_for_all_slugs(session, syndicate_mods.steel_meridian_mods, quantity=1, syndicate_rank=5)
-    # post_offers_for_all_slugs(session, )
+    currently_posted = check_current_offers(session)
+
+    #post_offers_for_all_slugs(session, syndicate_mods.steel_meridian_mods, standing=52000, syndicate_rank=5)
     # get_item_id_from_slug("fireball_frenzy")
     # post_offer(session, "fireball_frenzy", 10, 1, 0)
     

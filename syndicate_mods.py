@@ -1,4 +1,6 @@
+
 steel_meridian_mods = {
+    "cost": 25000,
     0: [], # Initiation
     1: [], # Brave
     2: [], # Valiant
@@ -50,6 +52,7 @@ steel_meridian_mods = {
 }
 
 arbiters_of_hexis_mods = {
+    "cost": 25000,
     0: [], 1: [], 2: [], 3: [],
     4: [ # Crusader (Weapon Augments)
         "gilded_truth", "blade_of_truth", "stinging_truth", "avenging_truth"
@@ -95,6 +98,7 @@ arbiters_of_hexis_mods = {
 }
 
 cephalon_suda_mods = {
+    "cost": 25000,
     0: [], 1: [], 2: [], 3: [],
     4: [ # Wise (Weapon Augments)
         "entropy_spike", "entropy_flight", "entropy_detonation", "entropy_burst"
@@ -134,6 +138,7 @@ cephalon_suda_mods = {
 }
 
 perrin_sequence_mods = {
+    "cost": 25000,
     0: [], 1: [], 2: [], 3: [],
     4: [ # Senior (Weapon Augments)
         "toxic_sequence", "deadly_sequence", "voltage_sequence", "sequence_burn"
@@ -179,6 +184,7 @@ perrin_sequence_mods = {
 }
 
 red_veil_mods = {
+    "cost": 25000,
     0: [], 1: [], 2: [], 3: [],
     4: [ # Revered (Weapon Augments)
         "gleaming_blight", "eroding_blight", "toxic_blight", "stockpiled_blight"
@@ -224,6 +230,7 @@ red_veil_mods = {
 }
 
 new_loka_mods = {
+    "cost": 25000,
     0: [], 1: [], 2: [], 3: [],
     4: [ # Pure (Weapon Augments)
         "winds_of_purity", "bright_purity", "lasting_purity", "disarming_purity"
@@ -266,4 +273,13 @@ new_loka_mods = {
         # Zephyr
         "target_fixation", "airburst_rounds", "jet_stream", "funnel_clouds", "anchored_glide"
     ]
+}
+
+syndicates = {
+    "steel_meridian": steel_meridian_mods,
+    "arbiters_of_hexis": arbiters_of_hexis_mods,
+    "cephalon_suda": cephalon_suda_mods,
+    "perrin_sequence": perrin_sequence_mods,
+    "red_veil": red_veil_mods,
+    "new_loka": new_loka_mods
 }
