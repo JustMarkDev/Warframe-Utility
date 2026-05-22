@@ -4,6 +4,7 @@ import time
 from math import floor
 import requests
 import syndicate_mods
+import streamlit as st
 
 BASE_URL = "https://api.warframe.market/v2"
 STATUS_FILE = "syndicate_status.json"
@@ -11,6 +12,22 @@ STATUS_FILE = "syndicate_status.json"
 def load_status():
     with open(STATUS_FILE, "r") as f:
         return json.load(f)
+    
+def save_status_from_state():
+    """Extracts data values from the live UI and saves them to disk."""
+    status_data = load_status()
+    
+    for faction_key in syndicate_mods.syndicates.keys():
+        # Read the explicit tracked state dictionary keys
+        live_rank = st.session_state.get(f"rank_{faction_key}")
+        live_standing = st.session_state.get(f"slide_{faction_key}")
+        
+        if live_rank is not None and live_standing is not None:
+            status_data[faction_key]["rank"] = int(live_rank)
+            status_data[faction_key]["standing"] = int(live_standing)
+            
+    with open(STATUS_FILE, "w") as f:
+        json.dump(status_data, f, indent=4)
 
 def save_status(data):
     with open(STATUS_FILE, "w") as f:
@@ -43,10 +60,38 @@ def post_offers_for_all_slugs(session, syndicate_slug_list, standing=0, syndicat
             post_price = slug_lowest_price - 1
             print(f"Lowest price for {slug}: {slug_lowest_price} platinum. Posting offer at {post_price} platinum.")
             post_offer(session, slug, post_price, quantity, 0)
-            time.sleep(0.1)
+            st.toast(f"Posted {quantity} {slug}s")
+            time.sleep(0.3)
     else:
         print(f"Not enough standing to post offers. Required: {syndicate_slug_list['cost']}, Available: {standing}")
-
+"""
+def process_faction_deduction(session, chosen_faction, sold_quantity, original_quantity):
+    # Updates the JSON file ledger and synchronously reduces active live listings on site.
+    status_data = load_status()
+    cost_per_mod = syndicate_mods.syndicates[chosen_faction]["cost"]
+    total_cost = cost_per_mod * sold_quantity
+    
+    # 1. Update persistent file database
+    status_data[chosen_faction]["standing"] -= total_cost
+    save_status(status_data)
+    
+    st.toast(f"Deducted {total_cost} standing from {chosen_faction}! Syncing market...")
+    
+    # 2. FIXED: Map and update live market listings via warframe.market API
+    # Extract every mod available at our current faction tier ranking level
+    current_rank = int(status_data[chosen_faction]["rank"])
+    to_update = list_available_syndicate_mods(syndicate_mods.syndicates[chosen_faction], current_rank)
+    
+    new_quantity = max(0, original_quantity - sold_quantity)
+    
+    for slug in to_update:
+        try:
+            # Call your live framework script function
+            update_order(session, slug, new_quantity=new_quantity)
+            print(f"Successfully reduced live offer for {slug} to x{new_quantity}")
+        except Exception as e:
+            print(f"Failed to update market asset {slug}: {e}")
+"""
 def check_current_offers(session):
     response = session.get(f"{BASE_URL}/orders/my")
     if response.status_code == 200:
@@ -90,7 +135,7 @@ def post_offer(session, item_slug, platinum, quantity, rank):
         print(f"Server message: {response.text}")
         return None
 
-def linked_item_sold(session, item_slug, original_quantity, sold_quantity=1):
+def linked_item_sold(session, item_slug, original_quantity, sold_quantity=1, chosen_faction=None):
     status_data = load_status()
     valid_factions = []
     
@@ -99,35 +144,27 @@ def linked_item_sold(session, item_slug, original_quantity, sold_quantity=1):
     for faction_name, info in status_data.items():
         faction_dict = syndicate_mods.syndicates[faction_name]
         cost = faction_dict["cost"]
-        
         available_mods = list_available_syndicate_mods(faction_dict, info["rank"])
+        
         if item_slug in available_mods and info["standing"] >= (cost * sold_quantity):
             valid_factions.append(faction_name)
             
     if not valid_factions:
         print(f"Error: No factions found with enough standing/rank to sell {item_slug}.")
-        return
+        return False
         
     elif len(valid_factions) == 1:
         chosen_faction = valid_factions[0]
         print(f"Automatically attributing sale to the only capable faction: {chosen_faction}")
         
     else:
-        print("This mod is available from multiple factions you possess standing with:")
-        for i, faction in enumerate(valid_factions):
-            current_standing = status_data[faction]["standing"]
-            print(f"  [{i}] {faction} (Current Standing: {current_standing})")
-            
-        while True:
-            try:
-                choice = int(input(f"Select which faction to subtract standing from (0-{len(valid_factions)-1}): "))
-                if 0 <= choice < len(valid_factions):
-                    chosen_faction = valid_factions[choice]
-                    break
-            except ValueError:
-                pass
-            print("Invalid selection. Please choose a number from the list.")
+        # If the web UI hasn't passed us a pre-selected faction choice yet, 
+        # return the valid list to show the popup selection tool.
+        if chosen_faction is None:
+            print("Multiple factions detected. Waiting for user input via Streamlit Pop-up...")
+            return valid_factions
 
+    # --- REST OF YOUR ORIGINAL FUNCTION CONTINUES EXECUTING UNCHANGED ---
     cost_per_mod = syndicate_mods.syndicates[chosen_faction]["cost"]
     total_cost = cost_per_mod * sold_quantity
     
@@ -136,11 +173,14 @@ def linked_item_sold(session, item_slug, original_quantity, sold_quantity=1):
     print(f"Deducted {total_cost} standing from {chosen_faction}. New balance: {status_data[chosen_faction]['standing']}")
     
     print(f"\nUpdating live offers for {chosen_faction}...")
-
+    
     to_update = list_available_syndicate_mods(syndicate_mods.syndicates[chosen_faction], status_data[chosen_faction]["rank"])
     for order in to_update:
         update_order(session, order, new_quantity=original_quantity - sold_quantity)
+        time.sleep(0.4)  # Brief pause to respect API rate limits
         print(f"Updated offer for {order} to reflect new quantity: {original_quantity - sold_quantity}")
+            
+    return True
 
 def get_orders_from_slug(session, item_slug):
     # 1. Retrieve the unique internal itemId string for this slug
@@ -224,6 +264,8 @@ def login():
     if profile_response.status_code == 200:
         print("Success! Authenticated via settings.conf token.")
         print(profile_response.json())
+        profile_data = profile_response.json().get("data", {})
+        session.accountName = profile_data.get("slug", "Unknown Tenno")
         return session # Return the active authenticated session to use elsewhere
     else:
         print(f"Failed to access profile. Status Code: {profile_response.status_code}")
@@ -235,4 +277,6 @@ if __name__ == "__main__":
     session = login()
     orders = check_current_offers(session)
     print(orders)
+    print(f"Order ID for scattered_justice: {get_orders_from_slug(session, 'scattered_justice')}")
+    linked_item_sold(session, "scattered_justice", original_quantity=5, sold_quantity=1)
     # print(get_orders_from_slug(session, "surging_dash"))

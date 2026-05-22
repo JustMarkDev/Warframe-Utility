@@ -42,3 +42,13 @@ A background routine to periodically check if you are being undercut and adjust 
 ## 📅 Project Status
 
 This utility is currently in early prototyping. The core logic is undergoing testing, and **there is no current timeline for a stable release.**
+
+What Works For Now:
+
+1) post offer via script
+2) post all mods purchaseable via one syndicate (only the six that sell augments for now) in quantity compatible with your standing availability
+3) update or delete listing if you sell some or all the mods respectively
+
+## TODO
+
+1) Web/Gtk interface for ease of use

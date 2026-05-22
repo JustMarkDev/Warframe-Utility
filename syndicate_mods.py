@@ -284,6 +284,15 @@ new_loka_mods = {
     ]
 }
 
+RANK_STANDING_LIMITS = {
+    5: 132000,
+    4: 99000,
+    3: 70000,
+    2: 44000,
+    1: 22000,
+    0: 5000
+}
+
 syndicates = {
     "steel_meridian": steel_meridian_mods,
     "arbiters_of_hexis": arbiters_of_hexis_mods,

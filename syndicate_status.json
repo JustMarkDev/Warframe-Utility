@@ -1,7 +1,7 @@
 {
     "steel_meridian": {
-        "standing": 0,
-        "rank": 0
+        "standing": 50000,
+        "rank": 5
     },
     "arbiters_of_hexis": {
         "standing": 0,
@@ -24,7 +24,7 @@
         "rank": 0
     },
     "test": {
-        "standing": 50000,
+        "standing": 0,
         "rank": 0
     }
 }
