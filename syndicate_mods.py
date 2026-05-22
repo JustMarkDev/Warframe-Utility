@@ -1,4 +1,13 @@
-
+test_mods = {
+    "cost": 25000,
+    0: [
+        "path_of_statues",
+        "surging_dash",
+        "blood_forge",
+        "freeze_force",
+        "staggering_shield"
+    ]
+}
 steel_meridian_mods = {
     "cost": 25000,
     0: [], # Initiation
@@ -281,5 +290,6 @@ syndicates = {
     "cephalon_suda": cephalon_suda_mods,
     "perrin_sequence": perrin_sequence_mods,
     "red_veil": red_veil_mods,
-    "new_loka": new_loka_mods
+    "new_loka": new_loka_mods,
+    "test": test_mods
 }
