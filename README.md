@@ -1,71 +1,51 @@
-# Warframe Market Syndicate Automator
+# 🛡️ Tenno Syndicate Automator
 
-An experimental automation tool designed to dynamically manage and scale Syndicate offerings on `warframe.market`.
+A lightweight, high-performance native desktop application designed for **Warframe** players to seamlessly track and manage their Syndicate standing, calculate listable offerings, automate undercutting calculations, and publish sell listings directly to the **warframe.market** HTTP REST APIs.
 
----
-
-> [!CAUTION]
-> **Disclaimer:** This project is a personal learning experience built with extensive use of AI assistance. It is completely independent and not affiliated with `warframe.market`. Automating platform interactions may violate their Terms of Service. **Use at your own risk.**
+Built with a safe, asynchronous **native Rust backend** (Tauri v2) and a reactive **Vite + React (TypeScript) + Vanilla CSS** dark-mode glassmorphic frontend.
 
 ---
 
-## 📌 Project Overview
+## 🚀 Easy Steps to Run & Develop
 
-This utility automates the process of converting in-game Syndicate standing into Platinum. Instead of manually listing individual mods and updating prices, the script acts as an automated manager that scales item quantities based on your inputted faction balance.
+Follow these simple steps to spin up the application on your system:
 
-[ Standing Balance ] ──> [ Calculate Inventory ] ──> [ Live Market Ledger ]
-(e.g., 100,000)          (100k / 25k = 4 units)         ( Cheaper by 1p )
+### 1. Prerequisites
+Ensure you have the following installed:
+*   [Node.js](https://nodejs.org/) (v18+)
+*   [Rust & Cargo](https://www.rust-lang.org/tools/install) (v1.75+)
 
----
+### 2. Startup Commands
+Open your terminal inside the project directory and run:
+```bash
+# Install npm dependencies
+npm install
 
-## 🛠️ Planned Features & Logic
-
-### 1. Manual Ledger Sync
-Since Warframe does not provide public APIs for player standing, you manually input your current rank and standing balances into a local config file, which the program uses as its source of truth.
-
-### 2. Automated Undercutting
-The engine automatically scans active online sellers for each mod and sets your price to:
-
-$$\text{Your Price} = \text{Cheapest Online Price} - 1\text{p}$$
-
-### 3. Dynamic Quantity Scaling
-Your listing quantities are directly tied to your available standing. When you log a sale, the script recalculates your balance and updates all linked mods in that syndicate:
-
-* **Before Sale:** **100,000 standing** with *Steel Meridian* = Lists **4 copies** of every mod.
-* **After Sale:** You sell 1 mod, dropping you to **75,000 standing** = Automatically updates all remaining listings to **3 copies**.
-
-### 4. Price Monitor *(Planned)*
-A background routine to periodically check if you are being undercut and adjust your active prices to keep your listings competitive.
+# Launch the desktop client in development mode
+npm run tauri dev
+```
+Tauri will automatically compile the Rust backend, bind the IPC handlers, and open the desktop application window.
 
 ---
 
-## 📅 Project Status
+## 🔑 How to Get your Authentication Cookie
 
-This utility is currently in early prototyping. The core logic is undergoing testing, and **there is no current timeline for a stable release.**
+To publish offers or log sales automatically, you must authenticate the core engine with your `warframe.market` account. Your token resides strictly on your local machine.
 
-What Works For Now:
-1) login to your warframe.market account via jwt token. The token needs to be taken from your browser:
-   - after loggin in via browser f12 to open inspect view
-   - find the storage tab
-   - on the left seleect cookies
-   - warframe.market
-   - there should be only one entry "JWT"
-   - copy the value inside the settings.conf file in the root of the project (if the file doesn't exist, create it)
-   - now you are logged in 
-1) post offer via script
-2) post all mods purchaseable via one syndicate (only the six that sell augments for now) in quantity compatible with your standing availability
-3) update or delete listing if you sell some or all the mods respectively
-4) use web interface to set standing for a syndicate, post all mods for syndicate with the click of a button
-5) sell mods for syndicate with the click of other button
+1.  Open **https://warframe.market** in your browser and log in to your account.
+2.  Press **F12** (or right-click anywhere and select **Inspect**) to open Developer Tools.
+3.  Go to the **Application** tab (on Chrome, Edge, Brave) or **Storage** tab (on Firefox).
+4.  Expand the **Cookies** section on the left sidebar and click on `https://warframe.market`.
+5.  Locate the cookie named **`JWT`** in the table list.
+6.  Double-click its **Value**, copy the entire string, and paste it into the **Tenno Verification Wizard** in the application!
 
-## TODO
+---
 
-1) Web/Gtk interface for ease of use
-2) A serious issue is the limit for listings that warframe.market sets for non-subscribers.
-   To solve this issue, I need to post only the (5-10) most traded mods in the last 48 hours, possibly something the user can set for himself
-   - The user may not want to sell as fast as possible, but to gain as much platinum per standing as possible. Should implement a function
-   that allows the user to choose how much weight it gives to the most traded mods, and how much to the ones that sell for more.
-3) I began to create the web interface, but the logic is wonky, and there are 2 main issues i need to address:
-   - error in the logic that recomputes the available standing after you sell mods
-   - the slider doesn't visually update after selling
-4) more functionalities, like mass post relics, post all relics sold by varzia and whatever comes to mind next
+## 🛡️ How to Operate the Automator
+
+Once authenticated, the application takes you to the main control room:
+
+1.  **Sync standing:** Adjust the sliders for each represented faction to match your in-game standing values. Standing caps are automatically recalculated if you adjust your faction rank dropdown.
+2.  **Publish offerings:** Click **"Publish Offerings"** for a faction. The Rust engine queries the lowest active prices for that faction's mods, undercuts them by `1 Platinum`, and posts/updates live sell orders on your behalf.
+3.  **Log sales:** Select a sold mod from the dropdown list, enter the quantity, and click **"Log Completed Sale"**.
+4.  **Resolve conflicts (Attribution Modal):** If the sold mod belongs to multiple active factions you represent, an elegant frosted-glass modal overlay will prompt you to select which syndicate's pool to deduct the standing from. The backend will automatically adjust standings and cascade update all your active market listings!
