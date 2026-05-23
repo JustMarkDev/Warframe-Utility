@@ -66,13 +66,69 @@ pub async fn load_syndicates() -> Result<InitData, AppError> {
     })
 }
 
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter};
+
 #[tauri::command]
-pub async fn save_token(token: String) -> Result<String, AppError> {
+pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppError> {
+    // 1. Inject the cookie listener script that polls document.cookie
+    let preload_script = r#"
+        (function() {
+          function getCookie(name) {
+            const value = "; " + document.cookie;
+            const parts = value.split("; " + name + "=");
+            if (parts.length === 2) return parts.pop().split(";").shift();
+          }
+          const interval = setInterval(() => {
+            const token = getCookie("JWT");
+            if (token) {
+              clearInterval(interval);
+              window.__TAURI__.ipc.invoke("capture_market_jwt", { token: token })
+                .catch(err => console.error("Capture error:", err));
+            }
+          }, 500);
+        })();
+    "#;
+
+    // 2. Open the official login page in a dedicated WebView window
+    let _window = WebviewWindowBuilder::new(
+        &app_handle,
+        "market_login_window",
+        WebviewUrl::App("https://warframe.market/login".parse().unwrap())
+    )
+    .title("Warframe.market Secure Verification")
+    .inner_size(700.0, 750.0)
+    .resizable(true)
+    .initialization_script(preload_script) // Injects preload JS
+    .build()
+    .map_err(|e| AppError::Other(e.to_string()))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn capture_market_jwt(
+    app_handle: tauri::AppHandle,
+    token: String
+) -> Result<String, AppError> {
     let client = MarketClient::new(&token);
+    
+    // 1. Validate the captured token with a request to warframe.market/v2/me
     let slug = client.validate_token().await?;
+    
+    // 2. Save token to user settings file
     save_jwt(SETTINGS_PATH, &token).await?;
+    
+    // 3. Find and close the login window
+    if let Some(window) = app_handle.get_webview_window("market_login_window") {
+        let _ = window.close();
+    }
+
+    // 4. Emit a success event to update the main app's React state
+    let _ = app_handle.emit("auth_success", slug.clone());
+    
     Ok(slug)
 }
+
 
 #[tauri::command]
 pub async fn update_standing(faction_key: String, standing: i32, rank: Option<i32>) -> Result<SyndicateState, AppError> {

@@ -749,55 +749,7 @@ body {
   }
 }
 
-/* Token instructions accordion/helper */
-.token-instructions-btn {
-  background: transparent;
-  border: none;
-  color: var(--color-gold);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-  margin-top: 8px;
-  outline: none;
-  transition: color 0.2s ease;
-}
 
-.token-instructions-btn:hover {
-  color: var(--text-primary);
-}
-
-.token-instructions-box {
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(199, 155, 61, 0.25);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: left;
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  animation: fadeIn 0.3s ease-out;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.token-instructions-box ol {
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.token-instructions-box li strong {
-  color: var(--text-primary);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 /* Expandable mod list drawer */
 .mods-preview-container {

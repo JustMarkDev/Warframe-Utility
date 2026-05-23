@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import "./App.css";
 
@@ -31,10 +32,8 @@ function App() {
   const [standings, setStandings] = useState<SyndicateState[]>([]);
 
   // Auth inputs
-  const [tokenInput, setTokenInput] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [showInstructions, setShowInstructions] = useState(false);
 
   // Publish tracking
   const [publishingFactions, setPublishingFactions] = useState<Set<string>>(new Set());
@@ -120,6 +119,8 @@ function App() {
   };
 
   useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
     const init = async () => {
       await loadData();
 
@@ -141,27 +142,36 @@ function App() {
       }
     };
     init();
+
+    // Register event listener for automated browser authentication
+    listen<string>("auth_success", (event) => {
+      setAuthenticated(true);
+      setAccountName(event.payload);
+      setAuthLoading(false);
+      addLog(`Authentication successful. Welcome back, Tenno ${event.payload}!`, "success");
+      loadData();
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
   }, []);
 
-  const handleSaveToken = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tokenInput.trim()) return;
-
+  const handleStartInAppLogin = async () => {
     setAuthLoading(true);
     setAuthError(null);
-    addLog("Sending authorization handshake to warframe.market...", "info");
+    addLog("Launching secure in-app verification browser...", "info");
 
     try {
-      const slug = await invoke<string>("save_token", { token: tokenInput.trim() });
-      setAccountName(slug);
-      setAuthenticated(true);
-      addLog(`Handshake completed. Welcome back, Tenno ${slug}!`, "success");
-      await loadData();
+      await invoke("start_in_app_login");
     } catch (e: any) {
       const errStr = e.data || e.toString();
       setAuthError(errStr);
-      addLog(`Authentication failed: ${errStr}`, "error");
-    } finally {
+      addLog(`Failed to start secure login: ${errStr}`, "error");
       setAuthLoading(false);
     }
   };
@@ -315,52 +325,32 @@ function App() {
       <div className="auth-wrapper">
         <div className="auth-card">
           <svg className="auth-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z" />
+            <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
           </svg>
-          <h2>Tenno Verification Required</h2>
-          <p>Please enter your <code>warframe.market</code> JWT cookie token. Your token is encrypted and resides safely on your local disk backend.</p>
+          <h2>Tenno Verification</h2>
+          <p>
+            Authenticate safely with your <code>warframe.market</code> account. 
+            Logging in via our secure In-App Browser supports Steam, Discord, Xbox, PSN, and Email.
+          </p>
           
-          <form onSubmit={handleSaveToken} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="auth-input-group">
-              <label htmlFor="token">JWT Token Header</label>
-              <input
-                id="token"
-                type="password"
-                className="auth-input"
-                placeholder="JWT cookie authentication token..."
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                disabled={authLoading}
-              />
-              <button
-                type="button"
-                className="token-instructions-btn"
-                onClick={() => setShowInstructions(!showInstructions)}
-              >
-                {showInstructions ? "Hide Instructions" : "How do I get my JWT token?"}
-              </button>
-              
-              {showInstructions && (
-                <div className="token-instructions-box">
-                  <strong>Easy Steps to Retrieve your Cookie:</strong>
-                  <ol>
-                    <li>Open <strong>https://warframe.market</strong> in your browser and log in.</li>
-                    <li>Press <strong>F12</strong> (or right-click anywhere and select <strong>Inspect</strong>) to open Developer Tools.</li>
-                    <li>Navigate to the <strong>Application</strong> tab (on Chrome/Edge) or <strong>Storage</strong> tab (on Firefox).</li>
-                    <li>Expand <strong>Cookies</strong> on the left, then select <code>https://warframe.market</code>.</li>
-                    <li>Locate the cookie named <code>JWT</code> in the table.</li>
-                    <li>Double-click its <strong>Value</strong> column, copy the entire string, and paste it here!</li>
-                  </ol>
-                </div>
-              )}
-            </div>
-            
-            {authError && <div className="auth-error">{authError}</div>}
-            
-            <button type="submit" className="btn-primary" disabled={authLoading}>
-              {authLoading ? "Verifying Token..." : "Authenticate Core"}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "8px" }}>
+            <button 
+              type="button" 
+              className="btn-primary" 
+              onClick={handleStartInAppLogin} 
+              disabled={authLoading}
+            >
+              {authLoading ? "Waiting for Authentication..." : "Secure Sign In"}
             </button>
-          </form>
+            
+            {authLoading && (
+              <p style={{ fontSize: "0.85rem", fontStyle: "italic", opacity: 0.8 }}>
+                Please complete the login in the pop-up window. Once logged in, it will close automatically.
+              </p>
+            )}
+          </div>
+          
+          {authError && <div className="auth-error">{authError}</div>}
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
 [package]
 name = "warframe-utility"
-version = "0.2.0"
+version = "0.3.0"
 description = "Warframe Market Syndicate Automator"
 authors = ["you"]
 edition = "2021"

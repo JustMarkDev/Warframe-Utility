@@ -10,7 +10,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::load_syndicates,
-            commands::save_token,
+            commands::start_in_app_login,
+            commands::capture_market_jwt,
             commands::update_standing,
             commands::publish_syndicate,
             commands::record_sale,
