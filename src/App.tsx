@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import "./App.css";
 
 interface SyndicateState {
@@ -284,7 +285,8 @@ function App() {
     addLog(`Downloading update v${availableUpdate.version}...`, "info");
     try {
       await availableUpdate.downloadAndInstall();
-      // App restarts automatically after install
+      addLog("Update installed successfully. Relaunching...", "success");
+      await relaunch();
     } catch (e: any) {
       addLog(`Update failed: ${e?.toString()}`, "error");
       setUpdateInstalling(false);
