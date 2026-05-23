@@ -37,7 +37,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "PLACEHOLDER — run `npm run tauri signer generate` and replace this with the generated public key before cutting a release",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDN0QwOUQ4MzUxNjk5Q0YKUldUUG1SWTEyQWw5UEhkb1Uydy9FOHhmWUZrZ1cxUkhQaEtaRmhtbUdmTUR5b2Q3c0toTW9odWwK",
       "endpoints": [
         "https://github.com/JustMarkDev/Warframe-Utility/releases/latest/download/latest.json"
       ]

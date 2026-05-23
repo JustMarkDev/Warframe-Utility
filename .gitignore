@@ -16,6 +16,10 @@ dist-ssr
 src-tauri/settings.conf
 src-tauri/syndicate_status.json
 
+# Tauri signing keys — NEVER commit these
+.tauri-signing-key
+.tauri-signing-key.pub
+
 # Leftover scaffold
 temp-vite/
 
