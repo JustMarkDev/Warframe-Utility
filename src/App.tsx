@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import "./App.css";
 
 interface SyndicateState {
@@ -21,52 +22,6 @@ interface LogEntry {
   message: string;
   type: "success" | "error" | "info";
 }
-
-// Flat list of all available mod slugs for autocomplete helper
-const ALL_MODS = [
-  "abating_link", "abundant_mutation", "accumulating_whipclaw", "aegis_gale", "afterburn",
-  "airburst_rounds", "anchored_glide", "antimatter_absorb", "assimilate", "axios_javelineers",
-  "balefire_surge", "ballistic_bullseye", "beguiling_lantern", "biting_frost", "blazing_pillage",
-  "blending_talons", "blinding_reave", "blood_forge", "calm_&_frenzy", "capacitance",
-  "cataclysmic_continuum", "cataclysmic_gate", "catapult", "cathode_current", "celestial_stomp",
-  "champions_blessing", "chaos_sphere", "chilling_globe", "chromatic_blade", "coil_recharge",
-  "concentrated_arrow", "conductive_sphere", "conductor", "contagion_cloud", "controlled_slide",
-  "counter_pulse", "creeping_terrify", "critical_surge", "damage_decoy", "dark_propagation",
-  "desiccations_curse", "despoil", "divine_retribution", "dread_ward", "duality",
-  "elemental_sandstorm", "elusive_retribution", "empowered_quiver", "endless_lullaby",
-  "energy_transfer", "enraged", "entropy_burst", "entropy_detonation", "entropy_flight",
-  "entropy_spike", "enveloping_cloud", "escape_velocity", "eternal_war", "everlasting_ward",
-  "exothermic", "explosive_legerdemain", "fireball_frenzy", "fracturing_crush", "freeze_force",
-  "funnel_clouds", "furious_javelin", "fused_crucible", "fused_reservoir", "gastro", "gourmand",
-  "greedy_pull", "guardian", "guardian_armor", "guided_effigy", "hall_of_malevolence",
-  "hallowed_eruption", "hallowed_reckoning", "healing_flame", "hearty_nourishment",
-  "hushed_invisibility", "hysterical_assault", "ice_wave_impedance", "icy_avalanche",
-  "immolated_radiance", "infiltrate", "insatiable", "intrepid_stand", "iron_shrapnel",
-  "ironclad_charge", "ironclad_flight", "irradiating_disarm", "jades_judgment", "jet_stream",
-  "justice_blades", "larva_burst", "lasting_covenant", "lingering_transmutation", "loyal_merulina",
-  "mach_crash", "magnetized_discharge", "mending_splinters", "merulina_guardian", "mesas_waltz",
-  "mesmer_shield", "mind_freak", "molecular_fission", "muzzle_flash", "negation_armor",
-  "neutralizing_justice", "neutron_star", "omikujis_fortune", "ore_gaze", "pacifying_bolts",
-  "parasitic_vitality", "partitioned_mallet", "path_of_statues", "peaceful_provocation",
-  "phoenix_renewal", "photon_repeater", "piercing_navigator", "piercing_roar",
-  "pilfering_strangledome", "pilfering_swarm", "pool_of_life", "prey_of_dynar", "primal_rage",
-  "prismatic_companion", "prolonged_paralysis", "pyroclastic_flow", "radiant_finish",
-  "razor_mortar", "razorwing_blitz", "reactive_storm", "reaping_chakram", "recrystalize",
-  "regenerative_molt", "reinforcing_stomp", "repair_dispensary", "resonance", "resonating_quake",
-  "revealing_spores", "reverse_rotorswell", "rift_haven", "rift_torrent", "rising_storm",
-  "rousing_plunder", "rubble_heap", "safeguard", "safeguard_switch", "savage_silence",
-  "savior_decoy", "scattered_justice", "seeking_shuriken", "shadow_haze", "shattered_storm",
-  "shattering_justice", "shield_of_shadows", "shock_trooper", "shocking_speed", "smite_infusion",
-  "smoke_shadow", "sonic_fracture", "soul_survivor", "spectral_spirit", "spectrosiphon",
-  "spellbound_harvest", "staggering_shield", "surging_blades", "surging_dash", "swift_bite",
-  "swing_line", "target_fixation", "tectonic_fracture", "teeming_virulence", "teleport_rush",
-  "temporal_artillery", "temporal_erosion", "tesla_bank", "tharros_lethality",
-  "the_relentless_lost", "thermal_transfer", "thrall_pact", "tidal_impunity", "titanic_rumbler",
-  "total_eclipse", "transistor_shield", "tribunal", "ulfruns_endurance", "untime_rift",
-  "valence_formation", "vampire_leech", "vampiric_grasp", "venari_bodyguard", "venom_dose",
-  "vexing_retaliation", "viral_tempest", "volatile_recompense", "warding_thurible",
-  "warriors_rest", "wrath_of_ukko", "wrecking_wall",
-].sort();
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -91,8 +46,9 @@ function App() {
     mods: string[];
   } | null>(null);
 
-  // Ledger state
-  const [saleItem, setSaleItem] = useState(ALL_MODS[0] || "");
+  // Sale form & catalog state
+  const [allMods, setAllMods] = useState<string[]>([]);
+  const [saleItem, setSaleItem] = useState("");
   const [saleQty, setSaleQty] = useState(1);
   const [saleLoading, setSaleLoading] = useState(false);
 
@@ -105,6 +61,10 @@ function App() {
 
   // Logging
   const [logs, setLogs] = useState<LogEntry[]>([]);
+
+  // Available update from GitHub Releases (null = up to date)
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null);
+  const [updateInstalling, setUpdateInstalling] = useState(false);
 
   // Mod catalog preview states
   const [factionMods, setFactionMods] = useState<Record<string, string[]>>({});
@@ -160,7 +120,27 @@ function App() {
   };
 
   useEffect(() => {
-    loadData();
+    const init = async () => {
+      await loadData();
+
+      // Load the full mod list from the backend (single source of truth)
+      try {
+        const mods = await invoke<string[]>("get_all_mods");
+        setAllMods(mods);
+        if (mods.length > 0) setSaleItem(mods[0]);
+      } catch (e) {
+        console.error("Failed to load mod catalog:", e);
+      }
+
+      // Silently check for updates — non-blocking, never throws to the user
+      try {
+        const update = await check();
+        if (update) setAvailableUpdate(update);
+      } catch {
+        // Network unavailable or updater not configured — safe to ignore
+      }
+    };
+    init();
   }, []);
 
   const handleSaveToken = async (e: React.FormEvent) => {
@@ -288,6 +268,19 @@ function App() {
     }
   };
 
+  const handleInstallUpdate = async () => {
+    if (!availableUpdate) return;
+    setUpdateInstalling(true);
+    addLog(`Downloading update v${availableUpdate.version}...`, "info");
+    try {
+      await availableUpdate.downloadAndInstall();
+      // App restarts automatically after install
+    } catch (e: any) {
+      addLog(`Update failed: ${e?.toString()}`, "error");
+      setUpdateInstalling(false);
+    }
+  };
+
   const getMaxStanding = (rank: number) => {
     switch (rank) {
       case 5: return 132000;
@@ -375,6 +368,29 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Update Available Premium Banner */}
+      {availableUpdate && (
+        <div className="update-banner">
+          <div className="update-banner-content">
+            <svg className="update-banner-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span className="update-banner-text">
+              New version <strong>v{availableUpdate.version}</strong> is available.
+            </span>
+          </div>
+          <button
+            className="btn-update-install"
+            disabled={updateInstalling}
+            onClick={handleInstallUpdate}
+          >
+            {updateInstalling ? "Installing..." : "Install & Restart"}
+          </button>
+        </div>
+      )}
+
       {/* Header bar */}
       <header className="app-header">
         <div className="header-title-group">
@@ -525,7 +541,7 @@ function App() {
               value={saleItem}
               onChange={(e) => setSaleItem(e.target.value)}
             >
-              {ALL_MODS.map((m) => (
+              {allMods.map((m) => (
                 <option key={m} value={m}>
                   {m.replace(/_/g, " ")}
                 </option>

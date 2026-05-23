@@ -88,9 +88,6 @@ async function main() {
     // 1. Generate domain.rs contents
     await generateRustDomain(syndicateMap);
 
-    // 2. Update App.tsx contents
-    await updateAppTsx(allSlugs);
-
     console.log("Successfully completed mod list synchronization!");
   } catch (error) {
     console.error("Failed to sync mods:", error);
@@ -283,37 +280,6 @@ mod tests {
   await fs.promises.writeFile(domainPath, code, 'utf-8');
 }
 
-async function updateAppTsx(allSlugs) {
-  const appPath = path.resolve('src', 'App.tsx');
-  console.log(`Updating ALL_MODS list in ${appPath}...`);
 
-  let fileContent = await fs.promises.readFile(appPath, 'utf-8');
-
-  // Format array to be pretty-printed
-  let formattedArray = 'const ALL_MODS = [\n';
-  let line = "  ";
-  for (let i = 0; i < allSlugs.length; i++) {
-    const slugStr = `"${allSlugs[i]}", `;
-    if ((line + slugStr).length > 100) {
-      formattedArray += line.trimEnd() + "\n";
-      line = "  " + slugStr;
-    } else {
-      line += slugStr;
-    }
-  }
-  if (line.trim() !== "") {
-    formattedArray += line.trimEnd() + "\n";
-  }
-  formattedArray += '].sort();';
-
-  // Replace const ALL_MODS = [ ... ].sort(); using regex
-  const regex = /const ALL_MODS = \[[^]*?\]\.sort\(\);/;
-  if (!regex.test(fileContent)) {
-    throw new Error("Could not find ALL_MODS definition in App.tsx!");
-  }
-
-  fileContent = fileContent.replace(regex, formattedArray);
-  await fs.promises.writeFile(appPath, fileContent, 'utf-8');
-}
 
 main();

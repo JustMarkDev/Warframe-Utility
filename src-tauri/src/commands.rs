@@ -174,3 +174,27 @@ pub fn get_faction_mods(faction_key: String, rank: i32) -> Result<Vec<String>, A
     Ok(mods.into_iter().map(|s| s.to_string()).collect())
 }
 
+/// Returns the sorted union of every mod slug available across all syndicates
+/// at their maximum rank. Used by the frontend sale dropdown — replaces the
+/// previously hardcoded ALL_MODS constant in App.tsx.
+#[tauri::command]
+pub fn get_all_mods() -> Result<Vec<String>, AppError> {
+    let factions = [
+        "steel_meridian",
+        "arbiters_of_hexis",
+        "cephalon_suda",
+        "perrin_sequence",
+        "red_veil",
+        "new_loka",
+    ];
+    let mut all_mods = std::collections::HashSet::new();
+    for faction in &factions {
+        for m in get_syndicate_mods(faction, 5) {
+            all_mods.insert(m.to_string());
+        }
+    }
+    let mut mods: Vec<String> = all_mods.into_iter().collect();
+    mods.sort();
+    Ok(mods)
+}
+

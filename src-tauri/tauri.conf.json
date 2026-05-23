@@ -34,5 +34,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "PLACEHOLDER — run `npm run tauri signer generate` and replace this with the generated public key before cutting a release",
+      "endpoints": [
+        "https://github.com/JustMarkDev/Warframe-Utility/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
