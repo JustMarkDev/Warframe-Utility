@@ -73,23 +73,6 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      # Dynamically inject the pushed tag version into tauri.conf.json, stripping any alphanumeric pre-release suffix (e.g., -alpha) to comply with Windows MSI versioning rules
-      - name: Inject tag version into tauri.conf.json
-        shell: node {0}
-        run: |
-          const fs = require('fs');
-          const path = 'src-tauri/tauri.conf.json';
-          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
-          let tag = process.env.GITHUB_REF_NAME || '1.0.0';
-          if (tag.startsWith('v')) {
-            tag = tag.substring(1);
-          }
-          // Split at '-' to strip alphanumeric suffixes like -alpha or -beta.1 so WiX does not fail
-          const cleanVersion = tag.split('-')[0];
-          config.version = cleanVersion;
-          fs.writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
-          console.log(`Successfully updated tauri.conf.json version to: ${cleanVersion} (original tag: ${tag})`);
-
       - name: Install dependencies
         run: npm ci
 
