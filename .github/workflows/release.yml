@@ -12,8 +12,6 @@ jobs:
   # JOB 1: Regenerate the database once and push it back to GitHub to avoid conflicts
   prepare:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -47,8 +45,6 @@ jobs:
   build:
     needs: prepare
     runs-on: ${{ matrix.platform }}
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       fail-fast: false
       matrix:
@@ -72,6 +68,21 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+
+      # Dynamically inject the pushed tag version into tauri.conf.json so the output installers (.exe, .msi, etc.) use the tag name
+      - name: Inject tag version into tauri.conf.json
+        shell: node {0}
+        run: |
+          const fs = require('fs');
+          const path = 'src-tauri/tauri.conf.json';
+          const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+          let tag = process.env.GITHUB_REF_NAME || '1.0.0';
+          if (tag.startsWith('v')) {
+            tag = tag.substring(1);
+          }
+          config.version = tag;
+          fs.writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
+          console.log(`Successfully updated tauri.conf.json version to: ${tag}`);
 
       - name: Install dependencies
         run: npm ci
