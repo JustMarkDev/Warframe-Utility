@@ -84,8 +84,12 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
             const token = getCookie("JWT");
             if (token) {
               clearInterval(interval);
-              window.__TAURI__.ipc.invoke("capture_market_jwt", { token: token })
-                .catch(err => console.error("Capture error:", err));
+              if (window.__TAURI__ && window.__TAURI__.core) {
+                window.__TAURI__.core.invoke("capture_market_jwt", { token: token })
+                  .catch(err => console.error("Capture error:", err));
+              } else {
+                console.error("Tauri IPC bridge not ready.");
+              }
             }
           }, 500);
         })();
