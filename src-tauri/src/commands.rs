@@ -95,7 +95,7 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
     let _window = WebviewWindowBuilder::new(
         &app_handle,
         "market_login_window",
-        WebviewUrl::App("https://warframe.market/login".parse().unwrap())
+        WebviewUrl::App("https://warframe.market/signin".parse().unwrap())
     )
     .title("Warframe.market Secure Verification")
     .inner_size(700.0, 750.0)
