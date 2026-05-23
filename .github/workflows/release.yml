@@ -12,6 +12,8 @@ jobs:
   # JOB 1: Regenerate the database once and push it back to GitHub to avoid conflicts
   prepare:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,6 +47,8 @@ jobs:
   build:
     needs: prepare
     runs-on: ${{ matrix.platform }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       fail-fast: false
       matrix:
@@ -69,7 +73,7 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      # Dynamically inject the pushed tag version into tauri.conf.json so the output installers (.exe, .msi, etc.) use the tag name
+      # Dynamically inject the pushed tag version into tauri.conf.json, stripping any alphanumeric pre-release suffix (e.g., -alpha) to comply with Windows MSI versioning rules
       - name: Inject tag version into tauri.conf.json
         shell: node {0}
         run: |
@@ -80,9 +84,11 @@ jobs:
           if (tag.startsWith('v')) {
             tag = tag.substring(1);
           }
-          config.version = tag;
+          // Split at '-' to strip alphanumeric suffixes like -alpha or -beta.1 so WiX does not fail
+          const cleanVersion = tag.split('-')[0];
+          config.version = cleanVersion;
           fs.writeFileSync(path, JSON.stringify(config, null, 2), 'utf8');
-          console.log(`Successfully updated tauri.conf.json version to: ${tag}`);
+          console.log(`Successfully updated tauri.conf.json version to: ${cleanVersion} (original tag: ${tag})`);
 
       - name: Install dependencies
         run: npm ci
