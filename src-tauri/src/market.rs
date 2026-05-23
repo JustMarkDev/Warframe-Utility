@@ -1,6 +1,27 @@
 use reqwest::Client;
 use serde_json::Value;
 use crate::domain::AppError;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
+static ITEM_ID_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn get_cached_item_id(item_slug: &str) -> Option<String> {
+    ITEM_ID_CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap()
+        .get(item_slug)
+        .cloned()
+}
+
+fn cache_item_id(item_slug: &str, item_id: &str) {
+    ITEM_ID_CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap()
+        .insert(item_slug.to_string(), item_id.to_string());
+}
 
 pub struct MarketClient {
     client: Client,
@@ -64,38 +85,49 @@ impl MarketClient {
     }
 
     pub async fn get_item_id(&self, item_slug: &str) -> Result<String, AppError> {
+        if let Some(item_id) = get_cached_item_id(item_slug) {
+            return Ok(item_id);
+        }
+
         let url = format!("{}/items/{}", self.base_url, item_slug);
         let resp = self.client.get(&url).send().await?;
         if resp.status().is_success() {
             let data: Value = resp.json().await?;
             if let Some(id) = data["data"]["id"].as_str() {
-                return Ok(id.to_string());
+                let item_id = id.to_string();
+                cache_item_id(item_slug, &item_id);
+                return Ok(item_id);
             }
         }
         Err(AppError::Other(format!("Failed to retrieve item ID for '{}'", item_slug)))
     }
 
-    pub async fn get_active_order_id(&self, item_id: &str) -> Result<Option<String>, AppError> {
+    pub async fn get_my_orders(&self) -> Result<HashMap<String, String>, AppError> {
         let url = format!("{}/orders/my", self.base_url);
         let resp = self.client.get(&url).send().await?;
+        let mut map = HashMap::new();
         if resp.status().is_success() {
             let data: Value = resp.json().await?;
             if let Some(orders) = data["data"].as_array() {
                 for order in orders {
-                    if order["itemId"].as_str() == Some(item_id) {
-                        if let Some(order_id) = order["id"].as_str() {
-                            return Ok(Some(order_id.to_string()));
-                        }
+                    if let (Some(item_id), Some(order_id)) = (order["itemId"].as_str(), order["id"].as_str()) {
+                        map.insert(item_id.to_string(), order_id.to_string());
                     }
                 }
             }
         }
-        Ok(None)
+        Ok(map)
     }
 
-    pub async fn post_or_update_listing(&self, item_slug: &str, quantity: i32, price: i32) -> Result<(), AppError> {
+    pub async fn post_or_update_listing(
+        &self,
+        item_slug: &str,
+        quantity: i32,
+        price: i32,
+        active_orders: &HashMap<String, String>,
+    ) -> Result<(), AppError> {
         let item_id = self.get_item_id(item_slug).await?;
-        let active_order = self.get_active_order_id(&item_id).await?;
+        let active_order = active_orders.get(&item_id).cloned();
 
         if let Some(order_id) = active_order {
             let url = format!("{}/order/{}", self.base_url, order_id);
@@ -127,9 +159,13 @@ impl MarketClient {
         Ok(())
     }
 
-    pub async fn delete_listing(&self, item_slug: &str) -> Result<(), AppError> {
+    pub async fn delete_listing(
+        &self,
+        item_slug: &str,
+        active_orders: &HashMap<String, String>,
+    ) -> Result<(), AppError> {
         let item_id = self.get_item_id(item_slug).await?;
-        let active_order = self.get_active_order_id(&item_id).await?;
+        let active_order = active_orders.get(&item_id).cloned();
 
         if let Some(order_id) = active_order {
             let url = format!("{}/order/{}", self.base_url, order_id);

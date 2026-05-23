@@ -15,6 +15,8 @@ async fn sync_listings(client: &MarketClient, state: &SyndicateState) -> Result<
     let mods = get_syndicate_mods(&state.faction_key, state.rank);
     let qty = state.listable_quantity();
 
+    let active_orders = client.get_my_orders().await?;
+
     if qty > 0 {
         for m in &mods {
             let lowest = client.get_lowest_price(m).await?;
@@ -22,11 +24,11 @@ async fn sync_listings(client: &MarketClient, state: &SyndicateState) -> Result<
                 Some(p) => i32::max(1, p - 1),
                 None => 10,
             };
-            client.post_or_update_listing(m, qty, price).await?;
+            client.post_or_update_listing(m, qty, price, &active_orders).await?;
         }
     } else {
         for m in &mods {
-            client.delete_listing(m).await?;
+            client.delete_listing(m, &active_orders).await?;
         }
     }
 
