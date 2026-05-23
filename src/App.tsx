@@ -138,8 +138,8 @@ function App() {
       try {
         const update = await check();
         if (update) setAvailableUpdate(update);
-      } catch {
-        // Network unavailable or updater not configured — safe to ignore
+      } catch (err) {
+        console.error("Update check failed:", err);
       }
     };
     init();
