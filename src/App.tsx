@@ -122,6 +122,26 @@ function App() {
   useEffect(() => {
     let unlisten: (() => void) | null = null;
 
+    const checkUpdates = async () => {
+      console.log("[Updater] Checking for updates...");
+      try {
+        const update = await check();
+        if (update) {
+          console.log(`[Updater] New update available: v${update.version}`);
+          addLog(`Auto-update: A new version v${update.version} is available.`, "info");
+          setAvailableUpdate(update);
+        } else {
+          console.log("[Updater] No update available. App is up to date.");
+          addLog("Auto-update check: App is up to date.", "info");
+          setAvailableUpdate(null);
+        }
+      } catch (err: any) {
+        const errMessage = err?.toString() || JSON.stringify(err);
+        console.error("[Updater] Update check failed:", err);
+        addLog(`Auto-update check failed: ${errMessage}`, "error");
+      }
+    };
+
     const init = async () => {
       await loadData();
 
@@ -134,15 +154,13 @@ function App() {
         console.error("Failed to load mod catalog:", e);
       }
 
-      // Silently check for updates — non-blocking, never throws to the user
-      try {
-        const update = await check();
-        if (update) setAvailableUpdate(update);
-      } catch (err) {
-        console.error("Update check failed:", err);
-      }
+      // Initial check for updates immediately on load
+      await checkUpdates();
     };
     init();
+
+    // Run background checks for updates every 15 minutes
+    const checkInterval = setInterval(checkUpdates, 15 * 60 * 1000);
 
     // Register event listener for automated browser authentication
     listen<string>("auth_success", (event) => {
@@ -156,6 +174,7 @@ function App() {
     });
 
     return () => {
+      clearInterval(checkInterval);
       if (unlisten) {
         unlisten();
       }
