@@ -13,6 +13,8 @@ pub fn run() {
             commands::load_syndicates,
             commands::start_in_app_login,
             commands::capture_market_jwt,
+            commands::cancel_login,
+            commands::logout,
             commands::update_standing,
             commands::publish_syndicate,
             commands::record_sale,

@@ -196,6 +196,28 @@ function App() {
     }
   };
 
+  const handleCancelLogin = async () => {
+    try {
+      await invoke("cancel_login");
+    } catch {
+      // Ignore errors — window may have already been closed
+    }
+    setAuthLoading(false);
+    setAuthError(null);
+    addLog("Login cancelled by user.", "info");
+  };
+
+  const handleLogout = async () => {
+    try {
+      await invoke("logout");
+      setAuthenticated(false);
+      setAccountName(null);
+      addLog("Successfully logged out. Cleared token and cookies.", "success");
+    } catch (e: any) {
+      addLog(`Failed to log out: ${e.toString()}`, "error");
+    }
+  };
+
   const handleStandingChange = (factionKey: string, standing: number) => {
     // Immediate reactive local update
     setStandings((prev) =>
@@ -365,9 +387,19 @@ function App() {
             </button>
             
             {authLoading && (
-              <p style={{ fontSize: "0.85rem", fontStyle: "italic", opacity: 0.8 }}>
-                Please complete the login in the pop-up window. Once logged in, it will close automatically.
-              </p>
+              <>
+                <p style={{ fontSize: "0.85rem", fontStyle: "italic", opacity: 0.8 }}>
+                  Please complete the login in the pop-up window. Once logged in, it will close automatically.
+                </p>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleCancelLogin}
+                  style={{ fontSize: "0.8rem" }}
+                >
+                  Cancel
+                </button>
+              </>
             )}
           </div>
           
@@ -411,9 +443,14 @@ function App() {
           <h1 className="app-title">Tenno Syndicate Automator</h1>
         </div>
         
-        <div className="user-badge">
-          <span className="badge-dot"></span>
-          <span>{accountName || "Authenticated Tenno"}</span>
+        <div className="user-badge-container">
+          <div className="user-badge">
+            <span className="badge-dot"></span>
+            <span>{accountName || "Authenticated Tenno"}</span>
+          </div>
+          <button type="button" className="btn-logout" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </header>
 
