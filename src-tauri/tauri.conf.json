@@ -39,7 +39,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVGMDIxRjVEODMzOThDNUYKUldSZmpEbURYUjhDWDRzMloyUjBXTldYUEF6WjlVZTFMWW1rS245anlQVTRES2xLK0lTWVZqUGIK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYwMzc4MDlGMkI0Q0REOTgKUldTWTNVd3JuNEEzOEs1TURBSVRTZnBUS0tVckFZVkZyYjdzVm9xWE1mLzBWYmpOZ2NVUElWMlMK",
       "endpoints": [
         "https://github.com/JustMarkDev/Warframe-Utility/releases/latest/download/latest.json"
       ]
