@@ -1,6 +1,6 @@
 [package]
 name = "warframe-utility"
-version = "0.4.2"
+version = "0.4.4"
 description = "Warframe Market Syndicate Automator"
 authors = ["you"]
 edition = "2021"
@@ -26,4 +26,3 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["fs", "io-util", "time"] }
-
