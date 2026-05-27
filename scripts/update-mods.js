@@ -1,7 +1,8 @@
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
-const API_URL = "https://raw.githubusercontent.com/WFCD/warframe-items/master/data/json/Mods.json";
+const API_URL =
+  "https://raw.githubusercontent.com/WFCD/warframe-items/master/data/json/Mods.json";
 
 // Mapping of Syndicate names from API to our internal keys
 const SYNDICATES = {
@@ -11,25 +12,25 @@ const SYNDICATES = {
   "perrin sequence": "perrin_sequence",
   "the perrin sequence": "perrin_sequence",
   "red veil": "red_veil",
-  "new loka": "new_loka"
+  "new loka": "new_loka",
 };
 
 // Mapping of Rank titles to numerical ranks (4 or 5)
 const RANKS = {
   // Rank 4
-  "protector": 4,
-  "crusade": 4,
-  "wise": 4,
-  "opportunity": 4,
-  "venerated": 4,
-  "defender": 4,
+  protector: 4,
+  crusade: 4,
+  wise: 4,
+  opportunity: 4,
+  venerated: 4,
+  defender: 4,
   // Rank 5
-  "general": 5,
-  "maxim": 5,
-  "genius": 5,
-  "partner": 5,
-  "exalted": 5,
-  "tycoon": 5
+  general: 5,
+  maxim: 5,
+  genius: 5,
+  partner: 5,
+  exalted: 5,
+  tycoon: 5,
 };
 
 async function main() {
@@ -48,7 +49,7 @@ async function main() {
       cephalon_suda: { 4: new Set(), 5: new Set() },
       perrin_sequence: { 4: new Set(), 5: new Set() },
       red_veil: { 4: new Set(), 5: new Set() },
-      new_loka: { 4: new Set(), 5: new Set() }
+      new_loka: { 4: new Set(), 5: new Set() },
     };
 
     const allSlugsSet = new Set();
@@ -60,7 +61,7 @@ async function main() {
         if (!drop.location) continue;
 
         // Split "Steel Meridian, Protector" into ["Steel Meridian", "Protector"]
-        const parts = drop.location.split(',');
+        const parts = drop.location.split(",");
         if (parts.length < 2) continue;
 
         const syndicateRaw = parts[0].trim().toLowerCase();
@@ -72,9 +73,10 @@ async function main() {
         if (factionKey && rankNum) {
           // Normalize slug to match warframe.market item slugs:
           // Lowercase, spaces replaced by underscores, remove single quotes, dashes to underscores.
-          let slug = item.name.toLowerCase()
-            .replace(/[']/g, '')
-            .replace(/[\s-]/g, '_');
+          let slug = item.name
+            .toLowerCase()
+            .replace(/[']/g, "")
+            .replace(/[\s-]/g, "_");
 
           syndicateMap[factionKey][rankNum].add(slug);
           allSlugsSet.add(slug);
@@ -83,7 +85,9 @@ async function main() {
     }
 
     const allSlugs = Array.from(allSlugsSet).sort();
-    console.log(`Found ${allSlugs.length} unique Syndicate augment/weapon mods!`);
+    console.log(
+      `Found ${allSlugs.length} unique Syndicate augment/weapon mods!`,
+    );
 
     // 1. Generate domain.rs contents
     await generateRustDomain(syndicateMap);
@@ -96,7 +100,7 @@ async function main() {
 }
 
 async function generateRustDomain(syndicateMap) {
-  const domainPath = path.resolve('src-tauri', 'src', 'domain.rs');
+  const domainPath = path.resolve("src-tauri", "src", "domain.rs");
   console.log(`Writing regenerated ${domainPath}...`);
 
   let code = `use serde::{Serialize, Deserialize};
@@ -149,6 +153,9 @@ pub enum AppError {
     InsufficientStanding {
         item_slug: String,
     },
+    AuthExpired {
+        message: String,
+    },
     Io(String),
     Network(String),
     Other(String),
@@ -163,6 +170,7 @@ impl fmt::Display for AppError {
             AppError::InsufficientStanding { item_slug } => {
                 write!(f, "No represented faction has enough standing to sell '{}'", item_slug)
             }
+            AppError::AuthExpired { message } => write!(f, "{}", message),
             AppError::Io(err) => write!(f, "IO Error: {}", err),
             AppError::Network(err) => write!(f, "Network/API Error: {}", err),
             AppError::Other(err) => write!(f, "{}", err),
@@ -277,9 +285,7 @@ mod tests {
 }
 `;
 
-  await fs.promises.writeFile(domainPath, code, 'utf-8');
+  await fs.promises.writeFile(domainPath, code, "utf-8");
 }
-
-
 
 main();

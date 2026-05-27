@@ -48,6 +48,9 @@ pub enum AppError {
     InsufficientStanding {
         item_slug: String,
     },
+    AuthExpired {
+        message: String,
+    },
     Io(String),
     Network(String),
     Other(String),
@@ -62,6 +65,7 @@ impl fmt::Display for AppError {
             AppError::InsufficientStanding { item_slug } => {
                 write!(f, "No represented faction has enough standing to sell '{}'", item_slug)
             }
+            AppError::AuthExpired { message } => write!(f, "{}", message),
             AppError::Io(err) => write!(f, "IO Error: {}", err),
             AppError::Network(err) => write!(f, "Network/API Error: {}", err),
             AppError::Other(err) => write!(f, "{}", err),
