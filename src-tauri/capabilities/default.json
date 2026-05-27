@@ -3,10 +3,5 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main", "market_login_window"],
-  "permissions": [
-    "core:default",
-    "opener:default",
-    "updater:default",
-    "process:allow-restart"
-  ]
+  "permissions": ["core:default", "updater:default", "process:allow-restart"]
 }

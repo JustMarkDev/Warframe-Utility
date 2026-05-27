@@ -24,12 +24,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "npm"
 
-      - name: Install dependencies and regenerate catalog
-        run: |
-          npm ci
-          npm run update-mods
+      - name: Regenerate catalog
+        run: npm run update-mods
 
       - name: Commit regenerated catalog
         run: |
@@ -49,10 +46,16 @@ jobs:
     runs-on: ${{ matrix.platform }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
     strategy:
       fail-fast: false
       matrix:
-        platform: [windows-latest, ubuntu-22.04]
+        include:
+          - platform: windows-latest
+            bundles: nsis
+          - platform: ubuntu-22.04
+            bundles: appimage
 
     steps:
       - name: Checkout repository
@@ -63,9 +66,10 @@ jobs:
       # Linux requires additional system packages to build webview and app indicator libraries
       - name: Install system dependencies (Linux only)
         if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          version: 1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -74,15 +78,21 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+
+      - name: Show sccache stats before build
+        run: sccache --show-stats
 
       - name: Build and Package Tauri App
         uses: tauri-apps/tauri-action@v0
@@ -95,3 +105,8 @@ jobs:
           releaseBody: "Tenno Syndicate Automator Release ${{ github.ref_name }}"
           releaseDraft: false
           prerelease: false
+          args: --bundles ${{ matrix.bundles }}
+
+      - name: Show sccache stats after build
+        if: always()
+        run: sccache --show-stats
