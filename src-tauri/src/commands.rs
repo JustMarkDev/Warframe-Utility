@@ -1,7 +1,7 @@
-use serde::Serialize;
-use crate::domain::{SyndicateState, AppError, get_syndicate_mods, get_syndicate_cost};
-use crate::persistence::{load_all_standings, save_all_standings, load_jwt, save_jwt};
+use crate::domain::{get_syndicate_cost, get_syndicate_mods, AppError, SyndicateState};
 use crate::market::MarketClient;
+use crate::persistence::{load_all_standings, load_jwt, save_all_standings, save_jwt};
+use serde::Serialize;
 
 const STATUS_PATH: &str = "syndicate_status.json";
 const SETTINGS_PATH: &str = "settings.conf";
@@ -24,7 +24,9 @@ async fn sync_listings(client: &MarketClient, state: &SyndicateState) -> Result<
                 Some(p) => i32::max(1, p - 1),
                 None => 10,
             };
-            client.post_or_update_listing(m, qty, price, &active_orders).await?;
+            client
+                .post_or_update_listing(m, qty, price, &active_orders)
+                .await?;
         }
     } else {
         for m in &mods {
@@ -40,6 +42,7 @@ pub struct InitData {
     pub standings: Vec<SyndicateState>,
     pub authenticated: bool,
     pub account_name: Option<String>,
+    pub auth_refresh_required: bool,
 }
 
 #[tauri::command]
@@ -52,12 +55,19 @@ pub async fn load_syndicates() -> Result<InitData, AppError> {
     let token_opt = load_jwt(SETTINGS_PATH).await?;
     let mut authenticated = false;
     let mut account_name = None;
+    let mut auth_refresh_required = false;
 
     if let Some(token) = token_opt {
         let client = MarketClient::new(&token);
-        if let Ok(slug) = client.validate_token().await {
-            authenticated = true;
-            account_name = Some(slug);
+        match client.validate_token().await {
+            Ok(slug) => {
+                authenticated = true;
+                account_name = Some(slug);
+            }
+            Err(AppError::AuthExpired { .. }) => {
+                auth_refresh_required = true;
+            }
+            Err(_) => {}
         }
     }
 
@@ -65,10 +75,11 @@ pub async fn load_syndicates() -> Result<InitData, AppError> {
         standings,
         authenticated,
         account_name,
+        auth_refresh_required,
     })
 }
 
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, Emitter};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[tauri::command]
 pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppError> {
@@ -96,7 +107,7 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
     let _window = WebviewWindowBuilder::new(
         &app_handle,
         "market_login_window",
-        WebviewUrl::External(url)
+        WebviewUrl::External(url),
     )
     .title("Warframe.market – Secure Sign In")
     .inner_size(700.0, 800.0)
@@ -113,14 +124,15 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
     let app_handle_clone = app_handle.clone();
     tokio::spawn(async move {
         println!("[WFU-Auth] Started background cookie polling task in Rust.");
-        
+
         let mut attempts = 0;
         let mut last_attempted_token = String::new();
 
         loop {
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             attempts += 1;
-            if attempts > 600 { // 5 minutes timeout
+            if attempts > 600 {
+                // 5 minutes timeout
                 println!("[WFU-Auth] Rust cookie polling timed out after 5 minutes.");
                 break;
             }
@@ -143,7 +155,10 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
 
                     for cookie in &cookies {
                         let name = cookie.name().to_string();
-                        let domain = cookie.domain().map(|d| d.to_string()).unwrap_or_else(|| "none".to_string());
+                        let domain = cookie
+                            .domain()
+                            .map(|d| d.to_string())
+                            .unwrap_or_else(|| "none".to_string());
                         cookie_names.push(format!("{} ({})", name, domain));
 
                         if name == "JWT" {
@@ -163,7 +178,7 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
                         if token != last_attempted_token {
                             last_attempted_token = token.clone();
                             println!("[WFU-Auth] Success! New JWT cookie captured via native cookies() API. Validating...");
-                            
+
                             // Call capture_market_jwt to validate, save, close window, and emit auth_success
                             match capture_market_jwt(app_handle_clone.clone(), token).await {
                                 Ok(slug) => {
@@ -172,7 +187,7 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
                                 }
                                 Err(e) => {
                                     eprintln!("[WFU-Auth] Error during validation/capture for this token: {:?}", e);
-                                    // Do NOT break the loop! A temporary, placeholder, or old expired token 
+                                    // Do NOT break the loop! A temporary, placeholder, or old expired token
                                     // shouldn't kill the poller. We continue waiting for a new/valid token.
                                 }
                             }
@@ -181,7 +196,10 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
                 }
                 Err(e) => {
                     if attempts % 20 == 0 {
-                        println!("[WFU-Auth] window.cookies() returned error: {}. Still trying...", e);
+                        println!(
+                            "[WFU-Auth] window.cookies() returned error: {}. Still trying...",
+                            e
+                        );
                     }
                 }
             }
@@ -194,16 +212,16 @@ pub async fn start_in_app_login(app_handle: tauri::AppHandle) -> Result<(), AppE
 #[tauri::command]
 pub async fn capture_market_jwt(
     app_handle: tauri::AppHandle,
-    token: String
+    token: String,
 ) -> Result<String, AppError> {
     let client = MarketClient::new(&token);
-    
+
     // 1. Validate the captured token with a request to warframe.market/v2/me
     let slug = client.validate_token().await?;
-    
+
     // 2. Save token to user settings file
     save_jwt(SETTINGS_PATH, &token).await?;
-    
+
     // 3. Find and close the login window
     if let Some(window) = app_handle.get_webview_window("market_login_window") {
         let _ = window.close();
@@ -211,7 +229,7 @@ pub async fn capture_market_jwt(
 
     // 4. Emit a success event to update the main app's React state
     let _ = app_handle.emit("auth_success", slug.clone());
-    
+
     println!("[WFU-Auth] JWT captured and validated. Account: {}", slug);
     Ok(slug)
 }
@@ -238,7 +256,7 @@ pub async fn logout(app_handle: tauri::AppHandle) -> Result<(), AppError> {
             Ok(_) => println!("[WFU-Auth] Successfully cleared all WebView browsing data, cookies, and local storage! Next login will be clean."),
             Err(e) => {
                 eprintln!("[WFU-Auth] Failed to clear WebView browsing data: {}. Falling back to manual cookie deletion...", e);
-                
+
                 // Fallback: Delete all cookies for warframe.market manually
                 let target_url_str = "https://warframe.market";
                 let parsed_url = match tauri::Url::parse(target_url_str) {
@@ -259,12 +277,14 @@ pub async fn logout(app_handle: tauri::AppHandle) -> Result<(), AppError> {
     Ok(())
 }
 
-
-
 #[tauri::command]
-pub async fn update_standing(faction_key: String, standing: i32, rank: Option<i32>) -> Result<SyndicateState, AppError> {
+pub async fn update_standing(
+    faction_key: String,
+    standing: i32,
+    rank: Option<i32>,
+) -> Result<SyndicateState, AppError> {
     let mut standings = load_all_standings(STATUS_PATH).await?;
-    
+
     let updated_state = if let Some(state) = standings.get_mut(&faction_key) {
         if let Some(r) = rank {
             state.rank = r;
@@ -273,9 +293,12 @@ pub async fn update_standing(faction_key: String, standing: i32, rank: Option<i3
         state.standing = i32::min(i32::max(0, standing), max_val);
         state.clone()
     } else {
-        return Err(AppError::Other(format!("Faction '{}' not found", faction_key)));
+        return Err(AppError::Other(format!(
+            "Faction '{}' not found",
+            faction_key
+        )));
     };
-    
+
     save_all_standings(STATUS_PATH, &standings).await?;
     Ok(updated_state)
 }
@@ -283,13 +306,18 @@ pub async fn update_standing(faction_key: String, standing: i32, rank: Option<i3
 #[tauri::command]
 pub async fn publish_syndicate(faction_key: String) -> Result<Vec<String>, AppError> {
     let standings = load_all_standings(STATUS_PATH).await?;
-    let state = standings.get(&faction_key)
+    let state = standings
+        .get(&faction_key)
         .ok_or_else(|| AppError::Other(format!("Faction '{}' not found", faction_key)))?;
-    
-    let token = load_jwt(SETTINGS_PATH).await?
-        .ok_or_else(|| AppError::Other("Not authenticated with warframe.market. Please set token first.".to_string()))?;
-    
+
+    let token = load_jwt(SETTINGS_PATH).await?.ok_or_else(|| {
+        AppError::Other(
+            "Not authenticated with warframe.market. Please set token first.".to_string(),
+        )
+    })?;
+
     let client = MarketClient::new(&token);
+    client.validate_token().await?;
     let available_mods = get_syndicate_mods(&faction_key, state.rank);
 
     sync_listings(&client, state).await?;
@@ -298,18 +326,26 @@ pub async fn publish_syndicate(faction_key: String) -> Result<Vec<String>, AppEr
 }
 
 #[tauri::command]
-pub async fn record_sale(item_slug: String, quantity: i32, faction_choice: Option<String>) -> Result<String, AppError> {
+pub async fn record_sale(
+    item_slug: String,
+    quantity: i32,
+    faction_choice: Option<String>,
+) -> Result<String, AppError> {
     let mut standings = load_all_standings(STATUS_PATH).await?;
-    let token = load_jwt(SETTINGS_PATH).await?
-        .ok_or_else(|| AppError::Other("Not authenticated with warframe.market. Please set token first.".to_string()))?;
-    
+    let token = load_jwt(SETTINGS_PATH).await?.ok_or_else(|| {
+        AppError::Other(
+            "Not authenticated with warframe.market. Please set token first.".to_string(),
+        )
+    })?;
+
     let client = MarketClient::new(&token);
+    client.validate_token().await?;
     let mut eligible_factions = Vec::new();
 
     for (key, state) in &standings {
         let available_mods = get_syndicate_mods(key, state.rank);
         let cost = get_syndicate_cost(key);
-        
+
         if available_mods.contains(&item_slug.as_str()) && state.standing >= (cost * quantity) {
             eligible_factions.push(key.clone());
         }
@@ -325,7 +361,10 @@ pub async fn record_sale(item_slug: String, quantity: i32, faction_choice: Optio
                 if eligible_factions.contains(choice) {
                     choice.clone()
                 } else {
-                    return Err(AppError::Other(format!("Chosen faction '{}' is not eligible to attribute this sale.", choice)));
+                    return Err(AppError::Other(format!(
+                        "Chosen faction '{}' is not eligible to attribute this sale.",
+                        choice
+                    )));
                 }
             }
             None => {
@@ -344,7 +383,7 @@ pub async fn record_sale(item_slug: String, quantity: i32, faction_choice: Optio
     if let Some(state) = standings.get_mut(&chosen_faction) {
         state.standing -= cost * quantity;
     }
-    
+
     save_all_standings(STATUS_PATH, &standings).await?;
 
     // Cascade Updates — sync listings atomically; if this fails the sale is
@@ -384,4 +423,3 @@ pub fn get_all_mods() -> Result<Vec<String>, AppError> {
     mods.sort();
     Ok(mods)
 }
-
